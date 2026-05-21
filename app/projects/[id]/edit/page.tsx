@@ -1,0 +1,636 @@
+"use client";
+
+import Link from "next/link";
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
+
+import {
+  getProjects,
+  normalizeProject,
+  normalizeProjectColor,
+  saveProjects,
+  Project,
+  Task,
+} from "@/lib/storage";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import ThemedMain from "@/components/ThemedMain";
+import { theme } from "@/lib/themeClasses";
+
+export default function EditProjectPage() {
+  const params = useParams();
+
+  const router = useRouter();
+
+  const [project, setProject] =
+    useState<Project | null>(null);
+
+  const [newTask, setNewTask] =
+    useState("");
+
+  const [newTaskDate, setNewTaskDate] =
+    useState("");
+
+  useEffect(() => {
+    const projects = getProjects();
+
+    const found = projects.find(
+      (p) => p.id === params.id
+    );
+
+    if (found) {
+      setProject(normalizeProject(found));
+    }
+  }, [params.id]);
+
+  function updateField(
+    key: keyof Project,
+    value: string
+  ) {
+    if (!project) return;
+
+    setProject({
+      ...project,
+      [key]: value,
+    });
+  }
+
+  function addTask() {
+    if (!project) return;
+
+    if (!newTask.trim()) return;
+
+    const task: Task = {
+      id: crypto.randomUUID(),
+      title: newTask,
+      completed: false,
+      date: newTaskDate,
+    };
+
+    setProject({
+      ...project,
+      tasks: [...project.tasks, task],
+    });
+
+    setNewTask("");
+    setNewTaskDate("");
+  }
+
+  function deleteTask(taskId: string) {
+    if (!project) return;
+
+    setProject({
+      ...project,
+
+      tasks: project.tasks.filter(
+        (task) => task.id !== taskId
+      ),
+    });
+  }
+
+  function moveTaskUp(index: number) {
+    if (!project) return;
+
+    if (index === 0) return;
+
+    const tasks = [...project.tasks];
+
+    [
+      tasks[index - 1],
+      tasks[index],
+    ] = [
+      tasks[index],
+      tasks[index - 1],
+    ];
+
+    setProject({
+      ...project,
+      tasks,
+    });
+  }
+
+  function moveTaskDown(index: number) {
+    if (!project) return;
+
+    if (
+      index ===
+      project.tasks.length - 1
+    ) {
+      return;
+    }
+
+    const tasks = [...project.tasks];
+
+    [
+      tasks[index + 1],
+      tasks[index],
+    ] = [
+      tasks[index],
+      tasks[index + 1],
+    ];
+
+    setProject({
+      ...project,
+      tasks,
+    });
+  }
+
+  function updateTaskDate(
+    taskId: string,
+    value: string
+  ) {
+    if (!project) return;
+
+    setProject({
+      ...project,
+
+      tasks: project.tasks.map(
+        (task) => {
+
+          if (task.id !== taskId) {
+            return task;
+          }
+
+          return {
+            ...task,
+            date: value,
+          };
+        }
+      ),
+    });
+  }
+
+  function saveProject() {
+    if (!project) return;
+
+    const normalized =
+      normalizeProject(project);
+
+    const projects = getProjects();
+
+    const updatedProjects =
+      projects.map((p) =>
+        p.id === normalized.id
+          ? normalized
+          : p
+      );
+
+    saveProjects(updatedProjects);
+
+    router.push(
+      `/projects/${project.id}`
+    );
+  }
+
+  if (!project) {
+    return (
+      <ThemedMain className="p-6">
+        <p className="text-zinc-400">
+          読み込み中...
+        </p>
+      </ThemedMain>
+    );
+  }
+
+  return (
+    <ThemedMain className="px-5 py-8 pb-32">
+
+      <div className="mx-auto max-w-md">
+
+        {/* 戻る */}
+        <Link
+          href={`/projects/${project.id}`}
+          className="
+            mb-6
+            inline-flex
+            items-center
+            gap-2
+
+            rounded-full
+
+            bg-white/70
+
+            px-4
+            py-2
+
+            text-sm
+            text-zinc-500
+
+            backdrop-blur-xl
+
+            shadow-[0_2px_10px_rgba(0,0,0,0.04)]
+          "
+        >
+          ← 戻る
+        </Link>
+
+        {/* カード */}
+        <div
+          className="
+            rounded-[38px]
+
+            border border-white/60
+
+            bg-white/75
+
+            p-6
+
+            backdrop-blur-2xl
+
+            shadow-[0_10px_40px_rgba(0,0,0,0.06)]
+          "
+        >
+
+          <h1 className="mb-8 text-2xl font-semibold">
+            案件編集
+          </h1>
+
+          {/* 依頼主 */}
+          <div className="mb-6">
+
+            <p className="mb-2 text-sm text-zinc-400">
+              依頼主
+            </p>
+
+            <input
+              value={project.client}
+
+              onChange={(e) =>
+                updateField(
+                  "client",
+                  e.target.value
+                )
+              }
+
+              className="
+                w-full
+
+                rounded-2xl
+
+                border border-zinc-200
+
+                bg-white/70
+
+                px-4
+                py-4
+
+                outline-none
+              "
+            />
+
+          </div>
+
+          {/* 依頼内容 */}
+          <div className="mb-6">
+
+            <p className="mb-2 text-sm text-zinc-400">
+              依頼内容
+            </p>
+
+            <input
+              value={project.title}
+
+              onChange={(e) =>
+                updateField(
+                  "title",
+                  e.target.value
+                )
+              }
+
+              className="
+                w-full
+
+                rounded-2xl
+
+                border border-zinc-200
+
+                bg-white/70
+
+                px-4
+                py-4
+
+                outline-none
+              "
+            />
+
+          </div>
+
+          {/* 納期 */}
+          <div className="mb-6">
+
+            <p className="mb-2 text-sm text-zinc-400">
+              納期
+            </p>
+
+            <input
+              type="date"
+
+              value={project.deadline}
+
+              onChange={(e) =>
+                updateField(
+                  "deadline",
+                  e.target.value
+                )
+              }
+
+              className="
+                w-full
+
+                rounded-2xl
+
+                border border-zinc-200
+
+                bg-white/70
+
+                px-4
+                py-4
+
+                outline-none
+              "
+            />
+
+          </div>
+
+          {/* 色 */}
+          <div className="mb-8">
+
+            <p className="mb-3 text-sm text-zinc-400">
+              イメージカラー
+            </p>
+
+            <input
+              type="color"
+
+              value={project.color}
+
+              onChange={(e) =>
+                updateField(
+                  "color",
+                  normalizeProjectColor(
+                    e.target.value
+                  )
+                )
+              }
+
+              className="
+                h-14
+                w-full
+
+                cursor-pointer
+
+                rounded-2xl
+                border-0
+
+                bg-transparent
+              "
+            />
+
+          </div>
+
+          {/* 作業 */}
+          <div>
+
+            <div className="mb-4 flex items-center justify-between">
+
+              <p className="text-sm font-medium">
+                作業
+              </p>
+
+              <p className="text-xs text-zinc-400">
+                {project.tasks.length}件
+              </p>
+
+            </div>
+
+            {/* 作業追加 */}
+            <div className="space-y-3">
+
+              <input
+                value={newTask}
+
+                onChange={(e) =>
+                  setNewTask(
+                    e.target.value
+                  )
+                }
+
+                placeholder="作業を追加"
+
+                className="
+                  w-full
+
+                  rounded-2xl
+
+                  border border-zinc-200
+
+                  bg-white/70
+
+                  px-4
+                  py-4
+
+                  outline-none
+                "
+              />
+
+              <input
+                type="date"
+
+                value={newTaskDate}
+
+                onChange={(e) =>
+                  setNewTaskDate(
+                    e.target.value
+                  )
+                }
+
+                className="
+                  w-full
+
+                  rounded-2xl
+
+                  border border-zinc-200
+
+                  bg-white/70
+
+                  px-4
+                  py-4
+
+                  outline-none
+                "
+              />
+
+              <button
+                onClick={addTask}
+
+                className={`w-full py-4 ${theme.btnSolid}`}
+              >
+                作業追加
+              </button>
+
+            </div>
+
+            {/* 作業一覧 */}
+            <div className="mt-5 space-y-3">
+
+              {project.tasks.map(
+                (task, index) => (
+
+                  <div
+                    key={task.id}
+
+                    className="
+                      rounded-[24px]
+
+                      border border-zinc-200
+
+                      bg-white/70
+
+                      p-4
+                    "
+                  >
+
+                    <div className="flex items-start justify-between">
+
+                      <div className="flex-1">
+
+                        <p className="text-sm font-medium">
+                          {task.title}
+                        </p>
+
+                        <input
+                          type="date"
+
+                          value={task.date}
+
+                          onChange={(e) =>
+                            updateTaskDate(
+                              task.id,
+                              e.target.value
+                            )
+                          }
+
+                          className="
+                            mt-3
+
+                            w-full
+
+                            rounded-xl
+
+                            border border-zinc-200
+
+                            bg-white/70
+
+                            px-3
+                            py-2
+
+                            text-sm
+
+                            outline-none
+                          "
+                        />
+
+                      </div>
+
+                      <div className="ml-3 flex flex-col gap-2">
+
+                        <button
+                          onClick={() =>
+                            moveTaskUp(index)
+                          }
+
+                          className="
+                            rounded-xl
+
+                            bg-zinc-100
+
+                            px-3
+                            py-1
+
+                            text-xs
+                          "
+                        >
+                          ↑
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            moveTaskDown(index)
+                          }
+
+                          className="
+                            rounded-xl
+
+                            bg-zinc-100
+
+                            px-3
+                            py-1
+
+                            text-xs
+                          "
+                        >
+                          ↓
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            deleteTask(task.id)
+                          }
+
+                          className="
+                            rounded-xl
+
+                            bg-red-100
+
+                            px-3
+                            py-1
+
+                            text-xs
+                            text-red-500
+                          "
+                        >
+                          削除
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* 保存 */}
+        <button
+          onClick={saveProject}
+
+          className={`
+            mt-4
+            w-full
+            rounded-[28px]
+            py-5
+            shadow-[0_8px_30px_rgba(0,0,0,0.12)]
+            ${theme.btnSolid}
+          `}
+        >
+          保存
+        </button>
+
+      </div>
+
+    </ThemedMain>
+  );
+}
