@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -18,8 +19,10 @@ import {
 } from "next/navigation";
 
 import {
+  getDefaultOnboarding,
   getOnboarding,
   saveOnboarding,
+  subscribeOnboardingChanged,
   type OnboardingSettings,
 } from "@/lib/storage";
 import {
@@ -33,12 +36,75 @@ import {
   enqueueMeasurement,
 } from "@/lib/tutorialMeasurementQueue";
 import {
-  getGuidedNavigateTarget,
+  getGuidedNavigateTargetForStep,
+  getStepProgress,
+  getTutorialTabForStep,
   GUIDED_STEPS,
-  matchesGuidedRoute,
+  matchesGuidedStepRoute,
   recoverStepForPathname,
   type GuidedStep,
 } from "@/lib/tutorialSteps";
+import type { TutorialTabId } from "@/lib/storage";
+import {
+  areAllTabsDone,
+  findFirstIncompleteTab,
+  findNextAvailableTab,
+  getStartStepForTab,
+  mergeTabProgress,
+} from "@/lib/tutorialProgress";
+import {
+  TUTORIAL_TAB_ORDER,
+} from "@/lib/tutorialSteps";
+
+function isTutorialTabId(
+  value: unknown
+): value is TutorialTabId {
+  return (
+    typeof value === "string" &&
+    TUTORIAL_TAB_ORDER.includes(
+      value as TutorialTabId
+    )
+  );
+}
+
+function resolveTutorialNavigation(
+  step: GuidedStep,
+  pathname: string
+): string | null {
+  if (matchesGuidedStepRoute(step, pathname)) {
+    return null;
+  }
+
+  const direct = getGuidedNavigateTargetForStep(
+    step,
+    pathname
+  );
+
+  if (direct) {
+    return direct;
+  }
+
+  if (step.route === "/projects/:id") {
+    const projects = getProjectsRepo();
+
+    if (projects.length > 0) {
+      return `/projects/${projects[0].id}`;
+    }
+
+    return "/projects";
+  }
+
+  const routeHome: Record<string, string> = {
+    "/": "/",
+    "/projects": "/projects",
+    "/projects/new": "/projects/new",
+    "/memos": "/memos",
+    "/month": "/month",
+    "/settings": "/settings",
+  };
+
+  return routeHome[step.route] ?? null;
+}
 import {
   endTutorialSession,
   isTutorialSessionActive,
@@ -99,9 +165,17 @@ type OnboardingContextValue = {
   ) => void;
   setTutorialModalOpen: (open: boolean) => void;
   bumpTutorialReady: () => void;
-  startTutorial: () => void;
+  startTutorial: (tab?: TutorialTabId) => void;
+  startTutorialTab: (tab: TutorialTabId) => void;
   skipTutorial: () => void;
+  skipTutorialTab: () => void;
+  skipTutorialTabById: (tab: TutorialTabId) => void;
   completeTutorial: () => void;
+  tutorialStepProgress: {
+    current: number;
+    total: number;
+    tabLabel: string;
+  };
   refreshOnboarding: () => void;
 };
 
@@ -114,6 +188,7 @@ const COMPLETE_FADE_MS = 600;
 const NAV_TOUR_IDS = new Set([
   "nav-home",
   "nav-projects",
+  "nav-memos",
   "nav-month",
   "nav-settings",
 ]);
@@ -197,10 +272,11 @@ export default function OnboardingProvider({
     null
   );
 
-  const [settings, setSettings] =
-    useState<OnboardingSettings>(
-      getOnboarding
-    );
+  const settings = useSyncExternalStore(
+    subscribeOnboardingChanged,
+    getOnboarding,
+    getDefaultOnboarding
+  );
 
   const [currentStepId, setCurrentStepId] =
     useState<string | null>(null);
@@ -249,9 +325,7 @@ export default function OnboardingProvider({
     tutorialModalOpen ? "modal-open" : "idle";
 
   const refreshOnboarding =
-    useCallback(() => {
-      setSettings(getOnboarding());
-    }, []);
+    useCallback(() => {}, []);
 
   const bumpTutorialReady = useCallback(() => {
     setReadyTick((tick) => tick + 1);
@@ -382,7 +456,8 @@ export default function OnboardingProvider({
   useEffect(() => {
     if (
       !isTutorialSessionActive() ||
-      !currentStepId
+      !currentStepId ||
+      pendingStepId
     ) {
       return;
     }
@@ -394,7 +469,7 @@ export default function OnboardingProvider({
 
     if (
       step &&
-      !matchesGuidedRoute(step.route, pathname)
+      !matchesGuidedStepRoute(step, pathname)
     ) {
       const recovered = recoverStepForPathname(
         pathname,
@@ -413,7 +488,7 @@ export default function OnboardingProvider({
         });
       }
     }
-  }, [currentStepId, pathname]);
+  }, [currentStepId, pathname, pendingStepId]);
 
   useEffect(() => {
     persistSession();
@@ -436,8 +511,23 @@ export default function OnboardingProvider({
 
     runTutorialHook(current?.beforeLeaveKey);
 
+    let nextSettings = getOnboarding();
+
+    for (const tab of [
+      "tasks",
+      "month",
+      "memo",
+      "settings",
+    ] as TutorialTabId[]) {
+      nextSettings = mergeTabProgress(
+        nextSettings,
+        tab,
+        { completed: true }
+      );
+    }
+
     saveOnboarding({
-      ...getOnboarding(),
+      ...nextSettings,
       tutorialCompleted: true,
       tutorialCompletedAt: new Date().toISOString(),
     });
@@ -518,7 +608,7 @@ export default function OnboardingProvider({
       return null;
     }
 
-    if (!matchesGuidedRoute(step.route, pathname)) {
+    if (!matchesGuidedStepRoute(step, pathname)) {
       return null;
     }
 
@@ -538,6 +628,24 @@ export default function OnboardingProvider({
     pathname,
     readyTick,
   ]);
+
+  useEffect(() => {
+    if (!isTutorialSessionActive()) {
+      return;
+    }
+
+    if (activeStep || pendingStepId) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      setIsTransitioning(false);
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [activeStep, pendingStepId]);
 
   const shouldShowHints = useMemo(() => {
     if (settings.hintMode === "off") {
@@ -579,6 +687,8 @@ export default function OnboardingProvider({
 
       setIsTransitioning(true);
       clearPinnedTourTarget();
+      setTargetRect(null);
+      setTargetMissing(false);
       logTutorialTimeline("step enter", stepId);
 
       runTutorialHook(previous?.beforeLeaveKey);
@@ -614,13 +724,15 @@ export default function OnboardingProvider({
       return;
     }
 
-    if (!matchesGuidedRoute(next.route, pathname)) {
+    if (!matchesGuidedStepRoute(next, pathname)) {
       return;
     }
 
     if (
       tutorialModalOpen &&
-      next.id === "nav-month"
+      next.id === "nav-month" &&
+      currentStepIdRef.current ===
+        "task-edit-save"
     ) {
       return;
     }
@@ -636,7 +748,8 @@ export default function OnboardingProvider({
       currentStepIdRef.current
         ? GUIDED_STEPS.find(
             (step) =>
-              step.id === currentStepIdRef.current
+              step.id ===
+              currentStepIdRef.current
           ) ?? null
         : null;
 
@@ -730,16 +843,53 @@ export default function OnboardingProvider({
       const next = GUIDED_STEPS[index + 1] ?? null;
 
       if (!next) {
+        if (current.tab) {
+          saveOnboarding(
+            mergeTabProgress(
+              getOnboarding(),
+              current.tab,
+              { completed: true }
+            )
+          );
+          refreshOnboarding();
+        }
+
         completeTutorial();
         return;
       }
 
+      if (current.tab !== next.tab) {
+        saveOnboarding(
+          mergeTabProgress(
+            getOnboarding(),
+            current.tab,
+            { completed: true }
+          )
+        );
+        refreshOnboarding();
+      }
+
       logTutorialTimeline("next step", next.id);
 
-      const navigateTarget = getGuidedNavigateTarget(
-        next.route,
-        pathname
-      );
+      let navigateTarget =
+        getGuidedNavigateTargetForStep(
+          next,
+          pathname
+        );
+
+      if (
+        !navigateTarget &&
+        !matchesGuidedStepRoute(
+          next,
+          pathname
+        )
+      ) {
+        navigateTarget =
+          resolveTutorialNavigation(
+            next,
+            pathname
+          );
+      }
 
       if (navigateTarget) {
         setIsTransitioning(true);
@@ -748,7 +898,7 @@ export default function OnboardingProvider({
         return;
       }
 
-      if (matchesGuidedRoute(next.route, pathname)) {
+      if (matchesGuidedStepRoute(next, pathname)) {
         if (shouldDeferStepCommit(current, next)) {
           setPendingStepId(next.id);
           bumpTutorialReady();
@@ -756,6 +906,19 @@ export default function OnboardingProvider({
         }
 
         transitionToStep(next.id);
+        return;
+      }
+
+      const fallbackNav =
+        resolveTutorialNavigation(
+          next,
+          pathname
+        );
+
+      if (fallbackNav) {
+        setIsTransitioning(true);
+        setPendingStepId(next.id);
+        router.push(fallbackNav);
         return;
       }
 
@@ -768,6 +931,7 @@ export default function OnboardingProvider({
       isTransitioning,
       isTutorialActive,
       pathname,
+      refreshOnboarding,
       router,
       transitionToStep,
       tutorialModalOpen,
@@ -1108,48 +1272,301 @@ export default function OnboardingProvider({
     [bumpTutorialReady]
   );
 
-  const startTutorial = useCallback(() => {
-    if (completeTimeoutRef.current) {
-      window.clearTimeout(completeTimeoutRef.current);
-      completeTimeoutRef.current = null;
+  const startTutorialSessionForStep = useCallback(
+    (stepId: string | null) => {
+      startTutorialSession();
+
+      persistTutorialSessionSnapshot({
+        active: true,
+        currentStepId: stepId,
+        pendingStepId: null,
+        tutorialStatus: "idle",
+        pathname,
+        pinnedSelector: null,
+        pinnedInstanceId: null,
+      });
+
+      notifyProjectsChanged();
+      setPendingStepId(null);
+      setPendingActionTourId(null);
+      setTargetMissing(false);
+      setTargetVisibleRatio(1);
+      setTutorialModalOpenState(false);
+      setIsTransitioning(false);
+      setCurrentStepId(stepId);
+      logTutorialTimeline(
+        "step enter",
+        stepId ?? "none"
+      );
+    },
+    [pathname]
+  );
+
+  const goToTutorialStep = useCallback(
+    (stepId: string) => {
+      const nextStep =
+        GUIDED_STEPS.find(
+          (step) => step.id === stepId
+        ) ?? null;
+
+      if (!nextStep) {
+        return;
+      }
+
+      const navigateTarget =
+        getGuidedNavigateTargetForStep(
+          nextStep,
+          pathname
+        );
+
+      if (navigateTarget) {
+        setIsTransitioning(true);
+        setPendingStepId(stepId);
+        router.push(navigateTarget);
+        return;
+      }
+
+      transitionToStep(stepId);
+    },
+    [pathname, router, transitionToStep]
+  );
+
+  const skipTutorialTabById = useCallback(
+    (tab: TutorialTabId) => {
+      const updated = mergeTabProgress(
+        getOnboarding(),
+        tab,
+        { skipped: true }
+      );
+
+      saveOnboarding(updated);
+      refreshOnboarding();
+
+      if (areAllTabsDone(updated)) {
+        saveOnboarding({
+          ...updated,
+          tutorialCompleted: true,
+          tutorialCompletedAt: new Date().toISOString(),
+        });
+        refreshOnboarding();
+      }
+
+      logTutorialTimeline("tab skipped", tab);
+    },
+    [refreshOnboarding]
+  );
+
+  const skipTutorialTab = useCallback(() => {
+    const stepId = currentStepIdRef.current;
+
+    if (!stepId) {
+      return;
     }
 
-    setIsCompleting(false);
-    setFadeStep(null);
-    runMeasureCleanup();
-    clearPinnedTourTarget();
-    startTutorialSession();
+    const tab = getTutorialTabForStep(stepId);
 
-    const firstStepId =
-      GUIDED_STEPS[0]?.id ?? null;
+    if (!tab) {
+      completeTutorial();
+      return;
+    }
 
-    persistTutorialSessionSnapshot({
-      active: true,
-      currentStepId: firstStepId,
-      pendingStepId: null,
-      tutorialStatus: "idle",
-      pathname,
-      pinnedSelector: null,
-      pinnedInstanceId: null,
-    });
-
-    notifyProjectsChanged();
-    setPendingStepId(null);
-    setPendingActionTourId(null);
-    setTargetMissing(false);
-    setTargetVisibleRatio(1);
-    setTutorialModalOpenState(false);
-    setIsTransitioning(false);
-    setCurrentStepId(firstStepId);
-    logTutorialTimeline(
-      "step enter",
-      firstStepId ?? "none"
+    const updated = mergeTabProgress(
+      getOnboarding(),
+      tab,
+      { skipped: true }
     );
 
-    if (pathname !== "/") {
-      router.push("/");
+    saveOnboarding(updated);
+    refreshOnboarding();
+
+    const nextTab = findNextAvailableTab(
+      updated,
+      tab
+    );
+
+    if (!nextTab) {
+      if (areAllTabsDone(updated)) {
+        saveOnboarding({
+          ...updated,
+          tutorialCompleted: true,
+          tutorialCompletedAt: new Date().toISOString(),
+        });
+        refreshOnboarding();
+      }
+
+      completeTutorial();
+      return;
     }
-  }, [pathname, router, runMeasureCleanup]);
+
+    const nextStepId =
+      getStartStepForTab(nextTab);
+
+    if (!nextStepId) {
+      completeTutorial();
+      return;
+    }
+
+    const nextStep =
+      GUIDED_STEPS.find(
+        (step) => step.id === nextStepId
+      ) ?? null;
+
+    if (!nextStep) {
+      completeTutorial();
+      return;
+    }
+
+    clearPinnedTourTarget();
+    runMeasureCleanup();
+    setTutorialModalOpenState(false);
+
+    const navigateTarget = resolveTutorialNavigation(
+      nextStep,
+      pathname
+    );
+
+    if (navigateTarget) {
+      setIsTransitioning(true);
+      setPendingStepId(nextStepId);
+      router.push(navigateTarget);
+      requestAnimationFrame(() => {
+        bumpTutorialReady();
+      });
+    } else {
+      requestAnimationFrame(() => {
+        transitionToStep(nextStepId);
+        bumpTutorialReady();
+      });
+    }
+
+    logTutorialTimeline("tab skipped", tab);
+  }, [
+    completeTutorial,
+    pathname,
+    refreshOnboarding,
+    router,
+    runMeasureCleanup,
+    transitionToStep,
+    bumpTutorialReady,
+  ]);
+
+  const startTutorialTab = useCallback(
+    (tab: TutorialTabId) => {
+      if (completeTimeoutRef.current) {
+        window.clearTimeout(
+          completeTimeoutRef.current
+        );
+        completeTimeoutRef.current = null;
+      }
+
+      setIsCompleting(false);
+      setFadeStep(null);
+      runMeasureCleanup();
+      clearPinnedTourTarget();
+
+      const stepId = getStartStepForTab(tab);
+
+      startTutorialSessionForStep(stepId);
+
+      if (stepId) {
+        goToTutorialStep(stepId);
+      }
+    },
+    [
+      goToTutorialStep,
+      runMeasureCleanup,
+      startTutorialSessionForStep,
+    ]
+  );
+
+  const startTutorial = useCallback(
+    (tab?: TutorialTabId) => {
+      if (completeTimeoutRef.current) {
+        window.clearTimeout(
+          completeTimeoutRef.current
+        );
+        completeTimeoutRef.current = null;
+      }
+
+      setIsCompleting(false);
+      setFadeStep(null);
+      runMeasureCleanup();
+      clearPinnedTourTarget();
+
+      const explicitTab = isTutorialTabId(tab)
+        ? tab
+        : undefined;
+
+      const incompleteTab =
+        findFirstIncompleteTab(getOnboarding());
+
+      if (!explicitTab && !incompleteTab) {
+        finalizeComplete();
+        return;
+      }
+
+      const targetTab =
+        explicitTab ?? incompleteTab ?? "tasks";
+
+      const firstStepId =
+        getStartStepForTab(targetTab);
+
+      startTutorialSessionForStep(
+        firstStepId
+      );
+
+      if (!firstStepId) {
+        return;
+      }
+
+      const firstStep =
+        GUIDED_STEPS.find(
+          (step) => step.id === firstStepId
+        ) ?? null;
+
+      if (
+        firstStep &&
+        !matchesGuidedStepRoute(
+          firstStep,
+          pathname
+        )
+      ) {
+        goToTutorialStep(firstStepId);
+        return;
+      }
+
+      if (
+        pathname !== "/" &&
+        !tab &&
+        targetTab === "tasks"
+      ) {
+        router.push("/");
+      }
+    },
+    [
+      finalizeComplete,
+      goToTutorialStep,
+      pathname,
+      router,
+      runMeasureCleanup,
+      startTutorialSessionForStep,
+    ]
+  );
+
+  const tutorialStepProgress = useMemo(
+    () => {
+      const progress = getStepProgress(
+        currentStepId
+      );
+
+      return {
+        current: progress.current,
+        total: progress.total,
+        tabLabel: progress.tabLabel,
+      };
+    },
+    [currentStepId]
+  );
 
   const value = useMemo(
     () => ({
@@ -1165,8 +1582,12 @@ export default function OnboardingProvider({
       setTutorialModalOpen,
       bumpTutorialReady,
       startTutorial,
+      startTutorialTab,
       skipTutorial: completeTutorial,
+      skipTutorialTab,
+      skipTutorialTabById,
       completeTutorial,
+      tutorialStepProgress,
       refreshOnboarding,
     }),
     [
@@ -1182,14 +1603,35 @@ export default function OnboardingProvider({
       setTutorialModalOpen,
       bumpTutorialReady,
       startTutorial,
+      startTutorialTab,
+      skipTutorialTab,
+      skipTutorialTabById,
+      tutorialStepProgress,
       refreshOnboarding,
       tutorialStatus,
     ]
   );
 
+  const sessionStep = useMemo((): GuidedStep | null => {
+    if (
+      !isTutorialSessionActive() ||
+      !currentStepId
+    ) {
+      return null;
+    }
+
+    return (
+      GUIDED_STEPS.find(
+        (step) => step.id === currentStepId
+      ) ?? null
+    );
+  }, [currentStepId]);
+
   const overlayStep = shouldShowWelcome
     ? null
-    : activeStep ?? fadeStep;
+    : activeStep ??
+      sessionStep ??
+      fadeStep;
 
   return (
     <OnboardingContext.Provider
@@ -1205,11 +1647,14 @@ export default function OnboardingProvider({
       {overlayStep && (
         <TutorialOverlay
           step={overlayStep}
-          targetRect={targetRect}
+          targetRect={
+            isTransitioning ? null : targetRect
+          }
           targetMissing={targetMissing}
           targetVisibleRatio={targetVisibleRatio}
           isTransitioning={isTransitioning}
           isCompleting={isCompleting}
+          stepProgress={tutorialStepProgress}
           onRetryTarget={retryTargetMeasurement}
         />
       )}

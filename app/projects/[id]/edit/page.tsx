@@ -182,6 +182,30 @@ export default function EditProjectPage() {
   }
 
   if (!project) {
+    const exists = getProjectsRepo().some(
+      (item) =>
+        item.id === String(params.id)
+    );
+
+    if (!exists) {
+      return (
+        <ThemedMain className="px-5 py-8 pb-32">
+          <div className="mx-auto max-w-md text-center">
+            <p className="text-zinc-500 dark:text-zinc-400">
+              案件が見つかりません
+            </p>
+
+            <Link
+              href="/projects"
+              className="mt-4 inline-block text-sm text-sky-600 dark:text-sky-400"
+            >
+              案件一覧へ戻る
+            </Link>
+          </div>
+        </ThemedMain>
+      );
+    }
+
     return (
       <ThemedMain className="p-6">
         <p className="text-zinc-400 dark:text-zinc-500">

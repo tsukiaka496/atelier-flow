@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import {
   useState,
+  type ButtonHTMLAttributes,
 } from "react";
 
 import {
@@ -14,12 +15,16 @@ import {
 import {
   Project,
 } from "@/lib/storage";
-import { getProjectsRepo, saveProjectsRepo } from "@/lib/projectsRepo";
+import {
+  getProjectsRepo,
+  saveProjectsRepo,
+} from "@/lib/projectsRepo";
+import { useProjectsRepo } from "@/lib/useProjectsRepo";
 
 import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
+import TaskEditorSheet from "@/components/TaskEditorSheet";
 import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
-import { theme } from "@/lib/themeClasses";
 import { appSurfaces } from "@/lib/appSurfaces";
 import { useTourAction } from "@/lib/useTourAction";
 
@@ -31,13 +36,11 @@ export default function ProjectDetailPage() {
   const triggerTaskSave = useTourAction("project-task-save");
 
   const router = useRouter();
-
-  const [project, setProject] =
-    useState<Project | null>(() => {
-      const id = String(params.id);
-      const projects = getProjectsRepo();
-      return projects.find((p) => p.id === id) ?? null;
-    });
+  const projects = useProjectsRepo();
+  const projectId = String(params.id);
+  const project =
+    projects.find((item) => item.id === projectId) ??
+    null;
 
   const [editingTaskId, setEditingTaskId] =
     useState<string | null>(null);
@@ -50,10 +53,21 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <ThemedMain className="p-6">
-        <p className="text-zinc-400 dark:text-zinc-500">
-          読み込み中...
-        </p>
+      <ThemedMain className="px-5 py-8 pb-32">
+        <div className="mx-auto max-w-md text-center">
+          <p className="text-zinc-500 dark:text-zinc-400">
+            案件が見つかりません
+          </p>
+
+          <Link
+            href="/projects"
+            className="mt-4 inline-block text-sm text-sky-600 dark:text-sky-400"
+          >
+            案件一覧へ戻る
+          </Link>
+        </div>
+
+        <BottomNav />
       </ThemedMain>
     );
   }
@@ -169,8 +183,6 @@ export default function ProjectDetailPage() {
       );
 
     saveProjectsRepo(updatedProjects);
-
-    setProject(updatedProject);
   }
 
   function openTaskEditor(taskId: string) {
@@ -195,6 +207,11 @@ export default function ProjectDetailPage() {
   function saveTaskEdits() {
     if (!editingTaskId) return;
 
+    if (!editTitle.trim()) {
+      alert("作業名を入力してください");
+      return;
+    }
+
     const updatedProject: Project = {
       ...currentProject,
       tasks: currentProject.tasks.map((t) => {
@@ -213,7 +230,6 @@ export default function ProjectDetailPage() {
     );
 
     saveProjectsRepo(updatedProjects);
-    setProject(updatedProject);
     closeTaskEditor();
   }
 
@@ -232,7 +248,6 @@ export default function ProjectDetailPage() {
     );
 
     saveProjectsRepo(updatedProjects);
-    setProject(updatedProject);
 
     if (editingTaskId === taskId) {
       closeTaskEditor();
@@ -638,110 +653,28 @@ export default function ProjectDetailPage() {
 
         </div>
 
-        {/* タスク編集モーダル */}
-        {editingTaskId && (
-          <div className="fixed inset-0 z-50">
-            <div
-              className="absolute inset-0 bg-black/40"
-              onClick={closeTaskEditor}
-            />
-            <div className="absolute bottom-0 left-0 right-0 mx-auto w-full max-w-md px-5 pb-6">
-              <div
-                className="
-                  rounded-[28px]
-                  border border-white/60 dark:border-zinc-700/50
-                  bg-white/95
-                  p-5
-                  shadow-[0_12px_40px_rgba(0,0,0,0.18)]
-                  backdrop-blur-xl
-                "
-              >
-                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                  作業を編集
-                </p>
-
-                <div className="mt-4 space-y-3">
-                  <input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    placeholder="例: ラフ提出"
-                    className="
-                      w-full
-                      rounded-2xl
-                      border border-zinc-200 dark:border-zinc-700
-                      bg-white dark:bg-zinc-900
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                    "
-                  />
-                  <input
-                    type="date"
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="
-                      w-full
-                      rounded-2xl
-                      border border-zinc-200 dark:border-zinc-700
-                      bg-white dark:bg-zinc-900
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                    "
-                  />
-                </div>
-
-                <div className="mt-5 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => deleteTask(editingTaskId)}
-                    className="
-                      rounded-xl
-                      px-3
-                      py-2
-                      text-xs
-                      text-red-500
-                      bg-red-50
-                    "
-                  >
-                    削除
-                  </button>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={closeTaskEditor}
-                      className="
-                        rounded-xl
-                        px-3
-                        py-2
-                        text-xs
-                        text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
-                        bg-white dark:bg-zinc-900
-                        border border-zinc-200 dark:border-zinc-700
-                      "
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      type="button"
-                      data-tour="project-task-save"
-                      onClick={() => {
-                        saveTaskEdits();
-                        triggerTaskSave();
-                      }}
-                      className={`px-4 py-2 ${theme.btnSolid}`}
-                    >
-                      保存
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <TaskEditorSheet
+          open={Boolean(editingTaskId)}
+          title={editTitle}
+          date={editDate}
+          onTitleChange={setEditTitle}
+          onDateChange={setEditDate}
+          onSave={() => {
+            saveTaskEdits();
+            triggerTaskSave();
+          }}
+          onClose={closeTaskEditor}
+          onDelete={
+            editingTaskId
+              ? () => deleteTask(editingTaskId)
+              : undefined
+          }
+          saveButtonProps={
+            {
+              "data-tour": "project-task-save",
+            } as ButtonHTMLAttributes<HTMLButtonElement>
+          }
+        />
 
       </div>
 

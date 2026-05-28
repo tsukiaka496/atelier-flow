@@ -1,6 +1,7 @@
 import {
   addProject as addPersistentProject,
   getProjects as getPersistentProjects,
+  invalidateStorageCacheFromEvent,
   saveProjects as savePersistentProjects,
   updateProject as updatePersistentProject,
   type Project,
@@ -24,9 +25,26 @@ export function subscribeProjectsChanged(
     return () => {};
   }
 
-  window.addEventListener(PROJECTS_CHANGED_EVENT, onChange);
+  const onStorage = (event: StorageEvent) => {
+    invalidateStorageCacheFromEvent(event.key);
+    onChange();
+  };
+
+  window.addEventListener(
+    PROJECTS_CHANGED_EVENT,
+    onChange
+  );
+  window.addEventListener("storage", onStorage);
+
   return () => {
-    window.removeEventListener(PROJECTS_CHANGED_EVENT, onChange);
+    window.removeEventListener(
+      PROJECTS_CHANGED_EVENT,
+      onChange
+    );
+    window.removeEventListener(
+      "storage",
+      onStorage
+    );
   };
 }
 

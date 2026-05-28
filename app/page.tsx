@@ -9,7 +9,10 @@ import Link from "next/link";
 import {
   saveProjectsRepo,
 } from "@/lib/projectsRepo";
+import { saveMemosRepo } from "@/lib/memosRepo";
+import { getMemoText } from "@/lib/memoDisplay";
 import { useProjectsRepo } from "@/lib/useProjectsRepo";
+import { useMemos } from "@/lib/useMemos";
 import {
   useShifts,
   useShiftTemplates,
@@ -72,6 +75,7 @@ export default function Home() {
     useState(0);
 
   const projects = useProjectsRepo();
+  const memos = useMemos();
   const shifts = useShifts();
   const templates = useShiftTemplates();
 
@@ -128,9 +132,20 @@ export default function Home() {
         )
       : null;
 
+  const activeMemos =
+    isViewingToday
+      ? memos.filter(
+          (memo) =>
+            memo.date === todayString
+        )
+      : [];
+
   const remainingCount =
     activeTasks.filter(
       (task) => !task.completed
+    ).length +
+    activeMemos.filter(
+      (memo) => !memo.isCompleted
     ).length;
 
   const weekText = `${weekDates[0].getMonth() + 1}/${weekDates[0].getDate()}〜${weekDates[6].getMonth() + 1}/${weekDates[6].getDate()}`;
@@ -323,6 +338,22 @@ export default function Home() {
     saveProjectsRepo(updatedProjects);
   }
 
+  function toggleMemo(memoId: string) {
+    const updated = memos.map((memo) => {
+      if (memo.id !== memoId) {
+        return memo;
+      }
+
+      return {
+        ...memo,
+        isCompleted: !memo.isCompleted,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    saveMemosRepo(updated);
+  }
+
   const topDays =
     weekDates.slice(0, 4);
 
@@ -498,6 +529,7 @@ export default function Home() {
 
               {activeTasks.length ===
                 0 &&
+                activeMemos.length === 0 &&
                 !activeTemplate &&
                 activeDeadlines.length ===
                   0 && (
@@ -507,6 +539,78 @@ export default function Home() {
                 </div>
 
               )}
+
+              {activeMemos.map((memo) => (
+                <button
+                  key={memo.id}
+                  type="button"
+                  onClick={() =>
+                    toggleMemo(memo.id)
+                  }
+                  className={`
+                    ${appSurfaces.taskButton}
+                    border-violet-200/80
+                    dark:border-violet-900/40
+                    ${
+                      memo.isCompleted
+                        ? `
+                          scale-[0.98]
+                          opacity-55
+                        `
+                        : `
+                          hover:scale-[1.01]
+                        `
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0 flex-1 text-left">
+                      <p className="text-xs font-medium text-violet-600 dark:text-violet-300">
+                        メモ
+                      </p>
+
+                      <p
+                        className={`mt-1 text-sm font-medium transition-all ${
+                          memo.isCompleted
+                            ? "line-through text-zinc-400 dark:text-zinc-500"
+                            : appSurfaces.bodyText
+                        }`}
+                      >
+                        {getMemoText(memo)}
+                      </p>
+                    </div>
+
+                    <div
+                      className="
+                        ml-4
+                        flex
+                        h-6
+                        w-6
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
+                        border
+                        text-xs
+                        transition-all
+                      "
+                      style={{
+                        background: memo.isCompleted
+                          ? "var(--theme-accent)"
+                          : "transparent",
+                        borderColor: memo.isCompleted
+                          ? "var(--theme-accent)"
+                          : "#d4d4d8",
+                        color: memo.isCompleted
+                          ? "white"
+                          : "transparent",
+                      }}
+                    >
+                      ✓
+                    </div>
+                  </div>
+                </button>
+              ))}
 
               {activeTasks.map((task) => (
 

@@ -38,6 +38,11 @@ type TutorialOverlayProps = {
   targetVisibleRatio: number;
   isTransitioning: boolean;
   isCompleting: boolean;
+  stepProgress: {
+    current: number;
+    total: number;
+    tabLabel: string;
+  };
   onRetryTarget: () => void;
 };
 
@@ -291,9 +296,11 @@ const TooltipPanel = memo(function TooltipPanel({
   bodyId,
   titleId,
   onSkip,
+  onSkipTab,
   onComplete,
   onCta,
   onRetry,
+  stepProgress,
 }: {
   step: GuidedStep;
   layout: TooltipLayoutResult;
@@ -303,9 +310,15 @@ const TooltipPanel = memo(function TooltipPanel({
   bodyId: string;
   titleId: string;
   onSkip: () => void;
+  onSkipTab: () => void;
   onComplete: () => void;
   onCta: () => void;
   onRetry: () => void;
+  stepProgress: {
+    current: number;
+    total: number;
+    tabLabel: string;
+  };
 }) {
   const panelClass = layout.compactMode
     ? tutorialTheme.tooltipPanelCompact
@@ -386,6 +399,13 @@ const TooltipPanel = memo(function TooltipPanel({
             {step.title}
           </p>
 
+          {stepProgress.total > 0 && (
+            <p className="mt-1 text-[11px] text-zinc-400">
+              {stepProgress.tabLabel}{" "}
+              {stepProgress.current}/{stepProgress.total}
+            </p>
+          )}
+
           <p id={bodyId} className={bodyClass}>
             {step.body}
           </p>
@@ -395,13 +415,23 @@ const TooltipPanel = memo(function TooltipPanel({
               layout.compactMode ? "mt-3" : "mt-4"
             }`}
           >
-            <button
-              type="button"
-              onClick={onSkip}
-              className={tutorialTheme.skipButton}
-            >
-              スキップ
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onSkipTab()}
+                className={tutorialTheme.skipButton}
+              >
+                タブをスキップ
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSkip()}
+                className={tutorialTheme.skipButton}
+              >
+                全体スキップ
+              </button>
+            </div>
 
             {step.cta ? (
               <button
@@ -442,10 +472,12 @@ export default function TutorialOverlay({
   targetVisibleRatio,
   isTransitioning,
   isCompleting,
+  stepProgress,
   onRetryTarget,
 }: TutorialOverlayProps) {
   const {
     skipTutorial,
+    skipTutorialTab,
     completeTutorial,
     runTourAction,
   } = useOnboarding();
@@ -548,7 +580,9 @@ export default function TutorialOverlay({
         isTransitioning={isTransitioning}
         bodyId={bodyId}
         titleId={titleId}
+        stepProgress={stepProgress}
         onSkip={skipTutorial}
+        onSkipTab={skipTutorialTab}
         onComplete={completeTutorial}
         onCta={handleCtaClick}
         onRetry={onRetryTarget}

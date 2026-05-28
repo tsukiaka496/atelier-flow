@@ -43,7 +43,6 @@ const accentColors = [
 
 export default function SettingsPage() {
   const theme = useThemeSettings();
-
   const fileInputRef =
     useRef<HTMLInputElement>(
       null

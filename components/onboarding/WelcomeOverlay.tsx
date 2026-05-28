@@ -84,7 +84,7 @@ export default function WelcomeOverlay({
 
           <button
             type="button"
-            onClick={onStart}
+            onClick={() => onStart()}
             className={tutorialTheme.welcomePrimary}
           >
             はじめる

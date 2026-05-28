@@ -90,7 +90,7 @@ export function isTutorialReady(
   const ready = readyRegistry.get(key);
 
   if (!ready) {
-    return true;
+    return false;
   }
 
   return ready();

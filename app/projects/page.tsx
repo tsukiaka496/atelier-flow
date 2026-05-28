@@ -16,10 +16,7 @@ import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
 import HintLabel from "@/components/onboarding/HintLabel";
 
-type SortType =
-  | "deadline"
-  | "updated"
-  | "progress";
+type SortType = "deadline" | "progress";
 
 const SORT_KEY = "atelier-sort";
 const SHOW_COMPLETED_KEY =
@@ -50,9 +47,16 @@ function notifyListPrefsChanged() {
 function getSortTypeSnapshot(): SortType {
   const savedSort = localStorage.getItem(
     SORT_KEY
-  ) as SortType | null;
+  );
 
-  return savedSort ?? "deadline";
+  if (
+    savedSort === "deadline" ||
+    savedSort === "progress"
+  ) {
+    return savedSort;
+  }
+
+  return "deadline";
 }
 
 function getShowCompletedSnapshot(): boolean {
@@ -166,8 +170,10 @@ export default function ProjectsPage() {
     return 0;
   });
 
-  const firstProjectId =
-    sortedProjects[0]?.id;
+  const tourProjectId =
+    projects.find(
+      (project) => project.isTutorial
+    )?.id ?? sortedProjects[0]?.id;
 
   return (
     <ThemedMain className="px-5 py-8 pb-32">
@@ -282,11 +288,10 @@ export default function ProjectsPage() {
               );
             const progress =
               getProgress(project);
-            const isFirstCard =
-              project.id ===
-              firstProjectId;
+            const isTourCard =
+              project.id === tourProjectId;
             const cardTourProps =
-              isFirstCard
+              isTourCard
                 ? tourInstanceProps(
                     "project-card",
                     projectCardInstance
@@ -299,7 +304,7 @@ export default function ProjectsPage() {
                   className={`block p-5 ${appSurfaces.card}`}
                   {...cardTourProps}
                   onClick={
-                    isFirstCard
+                    isTourCard
                       ? triggerProjectCard
                       : undefined
                   }
@@ -386,7 +391,7 @@ export default function ProjectsPage() {
                 </Link>
             );
 
-            if (isFirstCard) {
+            if (isTourCard) {
               return (
                 <HintLabel
                   key={project.id}

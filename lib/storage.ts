@@ -8,6 +8,7 @@ import {
   normalizeCustomBackgroundImages,
 } from "@/lib/themeBackgrounds";
 import { endTutorialSession } from "@/lib/tutorialSession";
+import { normalizeMemoImportance } from "@/lib/memoImportance";
 
 export type Task = {
   id: string;
@@ -39,12 +40,37 @@ export type Shift = {
   templateId: string;
 };
 
+export type Memo = {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  importance: number;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  isTutorial?: boolean;
+};
+
+export type TutorialTabId =
+  | "tasks"
+  | "memo"
+  | "month"
+  | "settings";
+
+export type TutorialTabProgress = {
+  completed: boolean;
+  skipped: boolean;
+};
+
 export type BackupData = {
   version: number;
   exportedAt: string;
   projects: Project[];
   shifts: Shift[];
   shiftTemplates: ShiftTemplate[];
+  /** v2 以降。旧バックアップとの互換のため省略可 */
+  memos?: Memo[];
   /** 旧バックアップとの互換のため省略可 */
   theme?: ThemeSettings;
 };
@@ -68,6 +94,9 @@ export type OnboardingSettings = {
   tutorialCompletedAt?: string;
   hintMode: HintMode;
   tutorialVersion?: number;
+  tutorialTabProgress?: Partial<
+    Record<TutorialTabId, TutorialTabProgress>
+  >;
 };
 
 const STORAGE_KEY =
@@ -85,10 +114,13 @@ const THEME_KEY =
 const ONBOARDING_KEY =
   "atelier-flow-onboarding";
 
+const MEMOS_KEY =
+  "atelier-flow-memos";
+
 const ONBOARDING_CHANGED_EVENT =
   "atelier-flow:onboarding-changed";
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 
 const SHIFTS_CHANGED_EVENT =
   "atelier-flow:shifts-changed";
@@ -155,6 +187,7 @@ export function getDefaultOnboarding(): OnboardingSettings {
 export const EMPTY_PROJECTS: Project[] = [];
 export const EMPTY_SHIFTS: Shift[] = [];
 export const EMPTY_SHIFT_TEMPLATES: ShiftTemplate[] = [];
+export const EMPTY_MEMOS: Memo[] = [];
 
 let projectsSnapshotKey: string | null | undefined;
 let projectsSnapshot: Project[] = EMPTY_PROJECTS;
@@ -173,6 +206,9 @@ let onboardingSnapshotKey: string | null | undefined;
 let onboardingSnapshot: OnboardingSettings =
   defaultOnboarding;
 
+let memosSnapshotKey: string | null | undefined;
+let memosSnapshot: Memo[] = EMPTY_MEMOS;
+
 function invalidateStorageSnapshots() {
   projectsSnapshotKey = undefined;
   projectsSnapshot = EMPTY_PROJECTS;
@@ -184,6 +220,8 @@ function invalidateStorageSnapshots() {
   themeSnapshot = DEFAULT_THEME;
   onboardingSnapshotKey = undefined;
   onboardingSnapshot = defaultOnboarding;
+  memosSnapshotKey = undefined;
+  memosSnapshot = EMPTY_MEMOS;
 }
 
 function notifyOnboardingChanged() {
@@ -660,6 +698,110 @@ export function saveOnboarding(
 }
 
 /* =========================
+   Memos
+========================= */
+
+function clampImportance(value: unknown): number {
+  return normalizeMemoImportance(value);
+}
+
+export function normalizeMemo(
+  raw: unknown
+): Memo {
+  const memo = raw as Record<string, unknown>;
+  const now = new Date().toISOString();
+
+  return {
+    id: String(
+      memo?.id ?? crypto.randomUUID()
+    ),
+
+    title:
+      typeof memo?.title === "string"
+        ? memo.title
+        : "",
+
+    content:
+      typeof memo?.content === "string"
+        ? memo.content
+        : "",
+
+    date:
+      typeof memo?.date === "string"
+        ? memo.date
+        : "",
+
+    importance: clampImportance(
+      memo?.importance
+    ),
+
+    isCompleted: Boolean(
+      memo?.isCompleted ?? memo?.completed
+    ),
+
+    createdAt:
+      typeof memo?.createdAt === "string"
+        ? memo.createdAt
+        : now,
+
+    updatedAt:
+      typeof memo?.updatedAt === "string"
+        ? memo.updatedAt
+        : now,
+
+    isTutorial:
+      typeof memo?.isTutorial === "boolean"
+        ? memo.isTutorial
+        : undefined,
+  };
+}
+
+export function getMemos(): Memo[] {
+  if (typeof window === "undefined") {
+    return EMPTY_MEMOS;
+  }
+
+  const data =
+    localStorage.getItem(MEMOS_KEY);
+
+  if (data === memosSnapshotKey) {
+    return memosSnapshot;
+  }
+
+  memosSnapshotKey = data;
+
+  if (!data) {
+    memosSnapshot = EMPTY_MEMOS;
+    return memosSnapshot;
+  }
+
+  try {
+    const parsed = JSON.parse(data);
+
+    if (!Array.isArray(parsed)) {
+      memosSnapshot = EMPTY_MEMOS;
+      return memosSnapshot;
+    }
+
+    memosSnapshot = parsed.map(normalizeMemo);
+    return memosSnapshot;
+  } catch {
+    memosSnapshot = EMPTY_MEMOS;
+    return memosSnapshot;
+  }
+}
+
+export function saveMemos(memos: Memo[]) {
+  const normalized = memos.map(normalizeMemo);
+  const json = JSON.stringify(normalized);
+
+  localStorage.setItem(MEMOS_KEY, json);
+
+  memosSnapshotKey = json;
+  memosSnapshot = normalized;
+}
+
+/* =========================
    Backup Export
 ========================= */
 
@@ -680,6 +822,8 @@ export function createBackupData(): BackupData {
 
     shiftTemplates:
       getShiftTemplates(),
+
+    memos: getMemos(),
 
     theme: getTheme(),
   };
@@ -773,6 +917,16 @@ function isValidBackupData(
   );
 }
 
+function normalizeBackupMemos(
+  data: BackupData
+): Memo[] {
+  if (!Array.isArray(data.memos)) {
+    return [];
+  }
+
+  return data.memos.map(normalizeMemo);
+}
+
 /* =========================
    Backup Import
 ========================= */
@@ -817,6 +971,10 @@ export async function importBackupFile(
       parsed.shiftTemplates
     );
 
+    saveMemos(
+      normalizeBackupMemos(parsed)
+    );
+
     if (parsed.theme) {
       saveTheme({
         ...defaultTheme,
@@ -847,6 +1005,22 @@ export async function importBackupFile(
   }
 }
 
+export function invalidateStorageCacheFromEvent(
+  key: string | null
+) {
+  if (key === STORAGE_KEY || key === null) {
+    projectsSnapshotKey = null;
+  }
+
+  if (key === MEMOS_KEY || key === null) {
+    memosSnapshotKey = null;
+  }
+
+  if (key === ONBOARDING_KEY || key === null) {
+    onboardingSnapshotKey = null;
+  }
+}
+
 /* =========================
    Clear All Data
 ========================= */
@@ -871,6 +1045,10 @@ export function clearAllData() {
 
   localStorage.removeItem(
     ONBOARDING_KEY
+  );
+
+  localStorage.removeItem(
+    MEMOS_KEY
   );
 
   invalidateStorageSnapshots();

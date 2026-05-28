@@ -629,6 +629,11 @@ export function scrollTourTargetIntoView(
   element: HTMLElement
 ) {
   const tourId = element.getAttribute("data-tour");
+
+  if (tourId?.startsWith("nav-")) {
+    return;
+  }
+
   const block =
     tourId === "create-project" ? "end" : "center";
 

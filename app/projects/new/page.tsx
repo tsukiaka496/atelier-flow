@@ -22,6 +22,7 @@ import ThemedMain from "@/components/ThemedMain";
 import { theme } from "@/lib/themeClasses";
 import DeadlineField from "@/components/DeadlineField";
 import TaskScheduleDateInput from "@/components/TaskScheduleDateInput";
+import TaskEditorSheet from "@/components/TaskEditorSheet";
 import { scrollTourTargetIntoView } from "@/lib/tutorialPositioning";
 import {
   registerTutorialAction,
@@ -64,6 +65,15 @@ export default function NewProjectPage() {
     useState("");
 
   const [taskDate, setTaskDate] =
+    useState("");
+
+  const [editingTaskId, setEditingTaskId] =
+    useState<string | null>(null);
+
+  const [editTitle, setEditTitle] =
+    useState("");
+
+  const [editDate, setEditDate] =
     useState("");
 
   const [exampleApplied, setExampleApplied] =
@@ -148,6 +158,53 @@ export default function NewProjectPage() {
     );
   }
 
+  function openTaskEditor(taskId: string) {
+    const task =
+      tasks.find((item) => item.id === taskId) ??
+      null;
+
+    if (!task) {
+      return;
+    }
+
+    setEditingTaskId(taskId);
+    setEditTitle(task.title);
+    setEditDate(task.date);
+  }
+
+  function closeTaskEditor() {
+    setEditingTaskId(null);
+    setEditTitle("");
+    setEditDate("");
+  }
+
+  function saveTaskEdits() {
+    if (!editingTaskId) {
+      return;
+    }
+
+    if (!editTitle.trim()) {
+      alert("作業名を入力してください");
+      return;
+    }
+
+    setTasks(
+      tasks.map((task) => {
+        if (task.id !== editingTaskId) {
+          return task;
+        }
+
+        return {
+          ...task,
+          title: editTitle.trim(),
+          date: editDate,
+        };
+      })
+    );
+
+    closeTaskEditor();
+  }
+
   function moveUp(index: number) {
     if (index === 0) return;
 
@@ -209,7 +266,7 @@ export default function NewProjectPage() {
   return (
     <ThemedMain className="px-5 py-8 pb-32">
 
-      <div className="mx-auto max-w-md">
+      <div className="mx-auto min-w-0 max-w-md">
 
         {/* 戻る */}
         <Link
@@ -406,7 +463,7 @@ export default function NewProjectPage() {
             </div>
 
             {/* 入力 */}
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
 
               <input
                 value={taskTitle}
@@ -489,6 +546,23 @@ export default function NewProjectPage() {
                       </div>
 
                       <div className="flex gap-2">
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openTaskEditor(task.id)
+                          }
+                          className="
+                            rounded-xl
+                            bg-zinc-100
+                            px-3
+                            py-1
+                            text-xs
+                            dark:bg-zinc-800
+                          "
+                        >
+                          編集
+                        </button>
 
                         <button
                           onClick={() =>
@@ -584,6 +658,21 @@ export default function NewProjectPage() {
         >
           依頼作成
         </button>
+
+        <TaskEditorSheet
+          open={Boolean(editingTaskId)}
+          title={editTitle}
+          date={editDate}
+          onTitleChange={setEditTitle}
+          onDateChange={setEditDate}
+          onSave={saveTaskEdits}
+          onClose={closeTaskEditor}
+          onDelete={
+            editingTaskId
+              ? () => removeTask(editingTaskId)
+              : undefined
+          }
+        />
 
       </div>
 

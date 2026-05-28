@@ -23,6 +23,10 @@ function isNavActive(
     return pathname.startsWith("/projects");
   }
 
+  if (href === "/memos") {
+    return pathname.startsWith("/memos");
+  }
+
   if (href === "/month") {
     return pathname === "/month";
   }
@@ -39,11 +43,13 @@ export default function BottomNav() {
 
   const triggerHome = useTourAction("nav-home");
   const triggerProjects = useTourAction("nav-projects");
+  const triggerMemos = useTourAction("nav-memos");
   const triggerMonth = useTourAction("nav-month");
   const triggerSettings = useTourAction("nav-settings");
 
   const homeInstance = useTourInstanceId("nav-home");
   const projectsInstance = useTourInstanceId("nav-projects");
+  const memosInstance = useTourInstanceId("nav-memos");
   const monthInstance = useTourInstanceId("nav-month");
   const settingsInstance = useTourInstanceId("nav-settings");
 
@@ -65,14 +71,14 @@ export default function BottomNav() {
         -translate-x-1/2
         items-center
         justify-between
-        px-6
+        px-3
         py-4
         ${appSurfaces.nav}
       `}
     >
       <Link
         href="/"
-        className={linkClass("/")}
+        className={`text-xs sm:text-sm ${linkClass("/")}`}
         {...tourInstanceProps("nav-home", homeInstance)}
         onClick={triggerHome}
       >
@@ -81,7 +87,7 @@ export default function BottomNav() {
 
       <Link
         href="/projects"
-        className={linkClass("/projects")}
+        className={`text-xs sm:text-sm ${linkClass("/projects")}`}
         {...tourInstanceProps("nav-projects", projectsInstance)}
         onClick={triggerProjects}
       >
@@ -89,8 +95,17 @@ export default function BottomNav() {
       </Link>
 
       <Link
+        href="/memos"
+        className={`text-xs sm:text-sm ${linkClass("/memos")}`}
+        {...tourInstanceProps("nav-memos", memosInstance)}
+        onClick={triggerMemos}
+      >
+        メモ
+      </Link>
+
+      <Link
         href="/month"
-        className={linkClass("/month")}
+        className={`text-xs sm:text-sm ${linkClass("/month")}`}
         {...tourInstanceProps("nav-month", monthInstance)}
         onClick={triggerMonth}
       >
@@ -99,7 +114,7 @@ export default function BottomNav() {
 
       <Link
         href="/settings"
-        className={linkClass("/settings")}
+        className={`text-xs sm:text-sm ${linkClass("/settings")}`}
         {...tourInstanceProps("nav-settings", settingsInstance)}
         onClick={triggerSettings}
       >
