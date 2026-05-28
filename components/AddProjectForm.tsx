@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import {
-  addProject as persistProject,
   DEFAULT_PROJECT_COLOR,
 } from "@/lib/storage";
+import { addProjectRepo } from "@/lib/projectsRepo";
 import { theme } from "@/lib/themeClasses";
 
 export default function AddProjectForm() {
@@ -13,7 +13,7 @@ export default function AddProjectForm() {
   function addProject() {
     if (!title.trim()) return;
 
-    persistProject({
+    addProjectRepo({
       id: crypto.randomUUID(),
       title: title.trim(),
       client: "",
@@ -30,7 +30,7 @@ export default function AddProjectForm() {
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="プロジェクト追加"
+        placeholder="例: SNSアイコン"
         className="
           w-full
           rounded-[16px]

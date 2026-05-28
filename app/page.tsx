@@ -1,22 +1,24 @@
 "use client";
 
-import Link from "next/link";
-
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import {
-  getProjects,
-  saveProjects,
-  getShifts,
-  getShiftTemplates,
-} from "@/lib/storage";
+  saveProjectsRepo,
+} from "@/lib/projectsRepo";
+import { useProjectsRepo } from "@/lib/useProjectsRepo";
+import {
+  useShifts,
+  useShiftTemplates,
+} from "@/lib/useShiftData";
+import { theme } from "@/lib/themeClasses";
+import { appSurfaces } from "@/lib/appSurfaces";
 
 import ThemedMain from "@/components/ThemedMain";
-import { theme } from "@/lib/themeClasses";
+import BottomNav from "@/components/BottomNav";
+import HintLabel from "@/components/onboarding/HintLabel";
 
 function getWeekDates(offset = 0) {
   const now = new Date();
@@ -68,27 +70,12 @@ export default function Home() {
   const [weekOffset, setWeekOffset] =
     useState(0);
 
-  const [projects, setProjects] =
-    useState(getProjects());
-
-  const [shifts, setShifts] =
-    useState<any[]>([]);
-
-  const [templates, setTemplates] =
-    useState<any[]>([]);
+  const projects = useProjectsRepo();
+  const shifts = useShifts();
+  const templates = useShiftTemplates();
 
   const [selectedDay, setSelectedDay] =
     useState<string | null>(null);
-
-  useEffect(() => {
-    setProjects(getProjects());
-
-    setShifts(getShifts());
-
-    setTemplates(
-      getShiftTemplates()
-    );
-  }, []);
 
   const weekDates = useMemo(
     () => getWeekDates(weekOffset),
@@ -216,9 +203,7 @@ export default function Home() {
         };
       });
 
-    setProjects(updatedProjects);
-
-    saveProjects(updatedProjects);
+    saveProjectsRepo(updatedProjects);
   }
 
   const topDays =
@@ -229,7 +214,6 @@ export default function Home() {
 
   return (
     <ThemedMain className="px-5 py-6 pb-32">
-
       <div className="mx-auto max-w-md">
 
         {/* タイトル */}
@@ -237,29 +221,17 @@ export default function Home() {
 
           <div>
 
-            <p className="text-sm text-zinc-400">
+            <p className={appSurfaces.mutedLabel}>
               illustrator workflow
             </p>
 
-            <h1 className="mt-1 text-2xl font-semibold tracking-wide">
+            <h1 className={`mt-1 ${appSurfaces.pageTitle}`}>
               atelier-flow
             </h1>
 
           </div>
 
-          <div
-            className="
-              rounded-full
-              border border-white/60
-              bg-white/70
-              px-4
-              py-2
-              text-sm
-              text-zinc-500
-              backdrop-blur-xl
-              shadow-[0_2px_10px_rgba(0,0,0,0.04)]
-            "
-          >
+          <div className={appSurfaces.glassBadge}>
             {today.getMonth() + 1}/
             {today.getDate()}
           </div>
@@ -268,27 +240,11 @@ export default function Home() {
 
         {/* 詳細表示 */}
         <div
-          className="
-            relative
-            mb-6
-            overflow-hidden
-            rounded-[34px]
-            border border-white/60
-            bg-white/75
-            p-5
-            backdrop-blur-2xl
-            shadow-[0_10px_30px_rgba(0,0,0,0.05)]
-          "
+          className={`mb-6 ${appSurfaces.heroCard}`}
         >
 
           <div
-            className="
-              pointer-events-none
-              absolute
-              inset-0
-              bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.9),transparent_35%)]
-              opacity-80
-            "
+            className={appSurfaces.heroSheen}
           />
 
           <div className="relative z-10">
@@ -330,16 +286,7 @@ export default function Home() {
 
               <div className="flex items-center gap-2">
 
-                <div
-                  className="
-                    rounded-full
-                    bg-zinc-100
-                    px-3
-                    py-1
-                    text-xs
-                    text-zinc-500
-                  "
-                >
+                <div className={appSurfaces.countChip}>
                   残り
                   {remainingCount}
                   件
@@ -380,7 +327,7 @@ export default function Home() {
                   シフト
                 </p>
 
-                <p className="mt-1 text-sm font-medium text-zinc-700">
+                <p className={`mt-1 text-sm font-medium ${appSurfaces.bodyText}`}>
                   {activeTemplate.start}
                   〜
                   {activeTemplate.end}
@@ -395,18 +342,7 @@ export default function Home() {
               {activeTasks.length ===
                 0 && !activeTemplate && (
 
-                <div
-                  className="
-                    rounded-2xl
-                    border border-dashed border-zinc-200
-                    bg-white/70
-                    px-4
-                    py-5
-                    text-center
-                    text-sm
-                    text-zinc-400
-                  "
-                >
+                <div className={appSurfaces.emptyPanel}>
                   予定はありません
                 </div>
 
@@ -425,16 +361,7 @@ export default function Home() {
                   }}
 
                   className={`
-                    w-full
-                    rounded-2xl
-                    border border-white/60
-                    bg-white/70
-                    px-4
-                    py-4
-                    text-left
-                    backdrop-blur-xl
-                    transition-all
-                    duration-300
+                    ${appSurfaces.taskButton}
 
                     ${
                       task.completed
@@ -472,8 +399,8 @@ export default function Home() {
 
                             ${
                               task.completed
-                                ? "line-through text-zinc-400"
-                                : "text-zinc-700"
+                                ? "line-through text-zinc-400 dark:text-zinc-500"
+                                : appSurfaces.bodyText
                             }
                           `}
                         >
@@ -556,6 +483,8 @@ export default function Home() {
         </div>
 
         {/* 週移動 */}
+        <HintLabel hintId="week-day">
+        <div data-tour="week-calendar">
         <div className="mb-4 flex items-center justify-between">
 
           <button
@@ -565,20 +494,12 @@ export default function Home() {
               )
             }
 
-            className="
-              rounded-full
-              bg-white/70
-              px-3
-              py-2
-              text-sm
-              text-zinc-500
-              shadow-[0_2px_10px_rgba(0,0,0,0.03)]
-            "
+            className={appSurfaces.roundButton}
           >
             ←
           </button>
 
-          <p className="text-sm text-zinc-500">
+          <p className={`text-sm ${appSurfaces.subtleText}`}>
             {weekText}
           </p>
 
@@ -589,15 +510,7 @@ export default function Home() {
               )
             }
 
-            className="
-              rounded-full
-              bg-white/70
-              px-3
-              py-2
-              text-sm
-              text-zinc-500
-              shadow-[0_2px_10px_rgba(0,0,0,0.03)]
-            "
+            className={appSurfaces.roundButton}
           >
             →
           </button>
@@ -655,14 +568,10 @@ export default function Home() {
                       : isToday
                       ? `
                         ${theme.border}
-                        bg-white
+                        ${appSurfaces.dayCellToday}
                         ${theme.shadowSoft}
                       `
-                      : `
-                        border-zinc-200
-                        bg-white/90
-                        shadow-[0_2px_10px_rgba(0,0,0,0.03)]
-                      `
+                      : appSurfaces.dayCellIdle
                   }
                 `}
               >
@@ -694,7 +603,7 @@ export default function Home() {
                       <div className={`h-2 w-2 rounded-full ${theme.dot}`} />
                     )}
 
-                    <p className="text-xs text-zinc-300">
+                    <p className="text-xs text-zinc-300 dark:text-zinc-500">
                       {date.getDate()}
                     </p>
 
@@ -713,7 +622,7 @@ export default function Home() {
                   {dayTasks.length ===
                     0 && !shift && (
 
-                    <p className="text-[10px] text-zinc-300">
+                    <p className="text-[10px] text-zinc-300 dark:text-zinc-500">
                       予定なし
                     </p>
 
@@ -816,14 +725,10 @@ export default function Home() {
                       : isToday
                       ? `
                         ${theme.border}
-                        bg-white
+                        ${appSurfaces.dayCellToday}
                         ${theme.shadowSoft}
                       `
-                      : `
-                        border-zinc-200
-                        bg-white/90
-                        shadow-[0_2px_10px_rgba(0,0,0,0.03)]
-                      `
+                      : appSurfaces.dayCellIdle
                   }
                 `}
               >
@@ -855,7 +760,7 @@ export default function Home() {
                       <div className={`h-2 w-2 rounded-full ${theme.dot}`} />
                     )}
 
-                    <p className="text-xs text-zinc-300">
+                    <p className="text-xs text-zinc-300 dark:text-zinc-500">
                       {date.getDate()}
                     </p>
 
@@ -874,7 +779,7 @@ export default function Home() {
                   {dayTasks.length ===
                     0 && !shift && (
 
-                    <p className="text-[10px] text-zinc-300">
+                    <p className="text-[10px] text-zinc-300 dark:text-zinc-500">
                       予定なし
                     </p>
 
@@ -925,59 +830,12 @@ export default function Home() {
 
         </div>
 
-      </div>
-
-      {/* 下バー */}
-      <div
-        className="
-          fixed
-          bottom-5
-          left-1/2
-          -translate-x-1/2
-          flex
-          items-center
-          justify-between
-          w-[92%]
-          max-w-md
-          rounded-[30px]
-          border border-white/60
-          bg-white/70
-          px-6
-          py-4
-          backdrop-blur-xl
-          shadow-[0_8px_30px_rgba(0,0,0,0.08)]
-        "
-      >
-
-        <Link
-          href="/"
-          className={theme.navActive}
-        >
-          ホーム
-        </Link>
-
-        <Link
-          href="/projects"
-          className="text-sm text-zinc-500"
-        >
-          案件
-        </Link>
-
-        <Link
-          href="/month"
-          className="text-sm text-zinc-500"
-        >
-          月
-        </Link>
-
-        <Link
-          href="/settings"
-          className="text-sm text-zinc-500"
-        >
-          設定
-        </Link>
+        </div>
+        </HintLabel>
 
       </div>
+
+      <BottomNav />
 
     </ThemedMain>
   );

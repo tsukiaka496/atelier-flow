@@ -4,19 +4,44 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
-  addProject,
   DEFAULT_PROJECT_COLOR,
   normalizeProjectColor,
   Task,
 } from "@/lib/storage";
+import { addProjectRepo } from "@/lib/projectsRepo";
+import { isTutorialSessionActive } from "@/lib/tutorialSession";
+import { createTutorialProjectDraft } from "@/lib/tutorialProjectDraft";
 
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import ThemedMain from "@/components/ThemedMain";
 import { theme } from "@/lib/themeClasses";
+import { scrollTourTargetIntoView } from "@/lib/tutorialPositioning";
+import {
+  registerTutorialAction,
+  registerTutorialReadyCheck,
+} from "@/lib/tutorialActionRegistry";
+import { useTourAction } from "@/lib/useTourAction";
+import {
+  tourInstanceProps,
+  useTourInstanceId,
+} from "@/lib/useTourInstanceId";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const { bumpTutorialReady } = useOnboarding();
+
+  const fillExampleInstance = useTourInstanceId(
+    "tutorial-fill-example"
+  );
+  const createProjectInstance = useTourInstanceId(
+    "create-project"
+  );
 
   const [client, setClient] =
     useState("");
@@ -38,6 +63,62 @@ export default function NewProjectPage() {
 
   const [taskDate, setTaskDate] =
     useState("");
+
+  const [exampleApplied, setExampleApplied] =
+    useState(false);
+
+  const applyTutorialExample = useCallback(() => {
+    const draft = createTutorialProjectDraft(new Date());
+    setClient(draft.project.client);
+    setTitle(draft.project.title);
+    setDeadline(draft.project.deadline);
+    setColor(draft.project.color);
+    setTasks(
+      draft.tasks.map((t) => ({
+        id: crypto.randomUUID(),
+        title: t.title,
+        completed: false,
+        date: t.date,
+      }))
+    );
+    setExampleApplied(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const createButton = document.querySelector(
+          '[data-tour="create-project"]'
+        );
+
+        if (createButton instanceof HTMLElement) {
+          scrollTourTargetIntoView(createButton);
+        }
+
+        bumpTutorialReady();
+      });
+    });
+  }, [bumpTutorialReady]);
+
+  const handleFillExample = useTourAction(
+    "tutorial-fill-example",
+    applyTutorialExample
+  );
+
+  useEffect(() => {
+    return registerTutorialAction(
+      "tutorial-fill-example",
+      applyTutorialExample
+    );
+  }, [applyTutorialExample]);
+
+  useEffect(() => {
+    return registerTutorialReadyCheck(
+      "project-form-filled",
+      () => exampleApplied
+    );
+  }, [exampleApplied]);
+
+  useEffect(() => {
+    bumpTutorialReady();
+  }, [exampleApplied, bumpTutorialReady]);
 
   function addTask() {
     if (!taskTitle.trim()) return;
@@ -102,17 +183,26 @@ export default function NewProjectPage() {
   }
 
   function createProject() {
-    addProject({
+    const tutorialFlag =
+      isTutorialSessionActive() && exampleApplied;
+
+    addProjectRepo({
       id: crypto.randomUUID(),
       client: client.trim(),
       title: title.trim(),
       deadline,
       color: normalizeProjectColor(color),
       tasks,
+      isTutorial: tutorialFlag ? true : undefined,
     });
 
     router.push("/projects");
   }
+
+  const handleCreateProject = useTourAction(
+    "create-project",
+    createProject
+  );
 
   return (
     <ThemedMain className="px-5 py-8 pb-32">
@@ -130,13 +220,13 @@ export default function NewProjectPage() {
 
             rounded-full
 
-            bg-white/70
+            bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
             px-4
             py-2
 
             text-sm
-            text-zinc-500
+            text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
 
             backdrop-blur-xl
 
@@ -148,12 +238,13 @@ export default function NewProjectPage() {
 
         {/* カード */}
         <div
+          data-tour="project-form"
           className="
             rounded-[38px]
 
-            border border-white/60
+            border border-white/60 dark:border-zinc-700/50 dark:border-zinc-700/50
 
-            bg-white/75
+            bg-white/75 dark:bg-zinc-900/80 dark:bg-zinc-900/80
 
             p-6
 
@@ -167,10 +258,36 @@ export default function NewProjectPage() {
             依頼追加
           </h1>
 
+          {isTutorialSessionActive() && (
+            <div className="mb-5">
+              <button
+                type="button"
+                {...tourInstanceProps(
+                  "tutorial-fill-example",
+                  fillExampleInstance
+                )}
+                onClick={handleFillExample}
+                className={`
+                  w-full
+                  rounded-[24px]
+                  border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
+                  bg-white/80 dark:bg-zinc-900/85 dark:bg-zinc-900/85
+                  px-4
+                  py-4
+                  text-sm
+                  text-zinc-700 dark:text-zinc-200 dark:text-zinc-200
+                  shadow-[0_8px_28px_rgba(0,0,0,0.06)]
+                `}
+              >
+                入力例を見る（自動入力）
+              </button>
+            </div>
+          )}
+
           {/* 依頼主 */}
           <div className="mb-6">
 
-            <p className="mb-2 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               依頼主
             </p>
 
@@ -179,15 +296,16 @@ export default function NewProjectPage() {
               onChange={(e) =>
                 setClient(e.target.value)
               }
+              placeholder="例: 依頼主の名前"
 
               className="
                 w-full
 
                 rounded-2xl
 
-                border border-zinc-200
+                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
 
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
                 px-4
                 py-4
@@ -201,7 +319,7 @@ export default function NewProjectPage() {
           {/* 内容 */}
           <div className="mb-6">
 
-            <p className="mb-2 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               依頼内容
             </p>
 
@@ -210,15 +328,16 @@ export default function NewProjectPage() {
               onChange={(e) =>
                 setTitle(e.target.value)
               }
+              placeholder="例: MVイラスト"
 
               className="
                 w-full
 
                 rounded-2xl
 
-                border border-zinc-200
+                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
 
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
                 px-4
                 py-4
@@ -232,7 +351,7 @@ export default function NewProjectPage() {
           {/* 納期 */}
           <div className="mb-6">
 
-            <p className="mb-2 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               納期
             </p>
 
@@ -252,9 +371,9 @@ export default function NewProjectPage() {
 
                 rounded-2xl
 
-                border border-zinc-200
+                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
 
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
                 px-4
                 py-4
@@ -268,7 +387,7 @@ export default function NewProjectPage() {
           {/* 色 */}
           <div className="mb-8">
 
-            <p className="mb-3 text-sm text-zinc-400">
+            <p className="mb-3 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               イメージカラー
             </p>
 
@@ -309,7 +428,7 @@ export default function NewProjectPage() {
                 作業
               </p>
 
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
                 {tasks.length}件
               </p>
 
@@ -327,16 +446,16 @@ export default function NewProjectPage() {
                   )
                 }
 
-                placeholder="作業名"
+                placeholder="例: ラフ提出"
 
                 className="
                   w-full
 
                   rounded-2xl
 
-                  border border-zinc-200
+                  border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
 
-                  bg-white/70
+                  bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
                   px-4
                   py-4
@@ -361,9 +480,9 @@ export default function NewProjectPage() {
 
                   rounded-2xl
 
-                  border border-zinc-200
+                  border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
 
-                  bg-white/70
+                  bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
                   px-4
                   py-4
@@ -394,9 +513,9 @@ export default function NewProjectPage() {
                     className="
                       rounded-[24px]
 
-                      border border-zinc-200
+                      border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
 
-                      bg-white/70
+                      bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
 
                       p-4
                     "
@@ -410,7 +529,7 @@ export default function NewProjectPage() {
                           {task.title}
                         </p>
 
-                        <p className="mt-1 text-xs text-zinc-400">
+                        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
 
                           {task.date ||
                             "日付なし"}
@@ -498,7 +617,11 @@ export default function NewProjectPage() {
 
         {/* 作成 */}
         <button
-          onClick={createProject}
+          onClick={handleCreateProject}
+          {...tourInstanceProps(
+            "create-project",
+            createProjectInstance
+          )}
 
           className={`
             mt-4

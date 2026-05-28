@@ -1,4 +1,13 @@
 import { normalizeHex } from "./colorFormat";
+import {
+  applyColorModeClass,
+  normalizeColorMode,
+  notifyThemeChange,
+} from "@/lib/colorMode";
+import {
+  normalizeCustomBackgroundImages,
+} from "@/lib/themeBackgrounds";
+import { endTutorialSession } from "@/lib/tutorialSession";
 
 export type Task = {
   id: string;
@@ -14,6 +23,8 @@ export type Project = {
   color: string;
   deadline: string;
   tasks: Task[];
+  /** チュートリアルで作成した案件（将来の除外/分析用） */
+  isTutorial?: boolean;
 };
 
 export type ShiftTemplate = {
@@ -42,6 +53,21 @@ export type ThemeSettings = {
   background: string;
   accent: string;
   backgroundImage: string;
+  colorMode?: "light" | "dark";
+  /** data URL で保存するユーザー追加の背景画像 */
+  customBackgroundImages?: string[];
+};
+
+export type HintMode =
+  | "first-run"
+  | "always"
+  | "off";
+
+export type OnboardingSettings = {
+  tutorialCompleted: boolean;
+  tutorialCompletedAt?: string;
+  hintMode: HintMode;
+  tutorialVersion?: number;
 };
 
 const STORAGE_KEY =
@@ -56,13 +82,139 @@ const SHIFT_KEY =
 const THEME_KEY =
   "atelier-flow-theme";
 
+const ONBOARDING_KEY =
+  "atelier-flow-onboarding";
+
+const ONBOARDING_CHANGED_EVENT =
+  "atelier-flow:onboarding-changed";
+
 const BACKUP_VERSION = 1;
+
+const SHIFTS_CHANGED_EVENT =
+  "atelier-flow:shifts-changed";
+
+function notifyShiftsChanged() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new Event(SHIFTS_CHANGED_EVENT)
+  );
+}
+
+export function subscribeShiftsChanged(
+  onChange: () => void
+) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener(
+    SHIFTS_CHANGED_EVENT,
+    onChange
+  );
+
+  return () => {
+    window.removeEventListener(
+      SHIFTS_CHANGED_EVENT,
+      onChange
+    );
+  };
+}
 
 const defaultTheme: ThemeSettings = {
   background: "#f7f7f5",
   accent: "#38bdf8",
   backgroundImage: "",
+  colorMode: "light",
 };
+
+/** SSR / hydration 用の固定参照 */
+export const DEFAULT_THEME: ThemeSettings = {
+  ...defaultTheme,
+  customBackgroundImages: [],
+};
+
+/** SSR と初回 hydration で使う固定デフォルト */
+export function getDefaultTheme(): ThemeSettings {
+  return DEFAULT_THEME;
+}
+
+const defaultOnboarding: OnboardingSettings =
+  {
+    tutorialCompleted: false,
+    hintMode: "first-run",
+    tutorialVersion: 1,
+  };
+
+export function getDefaultOnboarding(): OnboardingSettings {
+  return defaultOnboarding;
+}
+
+export const EMPTY_PROJECTS: Project[] = [];
+export const EMPTY_SHIFTS: Shift[] = [];
+export const EMPTY_SHIFT_TEMPLATES: ShiftTemplate[] = [];
+
+let projectsSnapshotKey: string | null | undefined;
+let projectsSnapshot: Project[] = EMPTY_PROJECTS;
+
+let shiftsSnapshotKey: string | null | undefined;
+let shiftsSnapshot: Shift[] = EMPTY_SHIFTS;
+
+let shiftTemplatesSnapshotKey: string | null | undefined;
+let shiftTemplatesSnapshot: ShiftTemplate[] =
+  EMPTY_SHIFT_TEMPLATES;
+
+let themeSnapshotKey: string | null | undefined;
+let themeSnapshot: ThemeSettings = DEFAULT_THEME;
+
+let onboardingSnapshotKey: string | null | undefined;
+let onboardingSnapshot: OnboardingSettings =
+  defaultOnboarding;
+
+function invalidateStorageSnapshots() {
+  projectsSnapshotKey = undefined;
+  projectsSnapshot = EMPTY_PROJECTS;
+  shiftsSnapshotKey = undefined;
+  shiftsSnapshot = EMPTY_SHIFTS;
+  shiftTemplatesSnapshotKey = undefined;
+  shiftTemplatesSnapshot = EMPTY_SHIFT_TEMPLATES;
+  themeSnapshotKey = undefined;
+  themeSnapshot = DEFAULT_THEME;
+  onboardingSnapshotKey = undefined;
+  onboardingSnapshot = defaultOnboarding;
+}
+
+function notifyOnboardingChanged() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new Event(ONBOARDING_CHANGED_EVENT)
+  );
+}
+
+export function subscribeOnboardingChanged(
+  onChange: () => void
+) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener(
+    ONBOARDING_CHANGED_EVENT,
+    onChange
+  );
+
+  return () => {
+    window.removeEventListener(
+      ONBOARDING_CHANGED_EVENT,
+      onChange
+    );
+  };
+}
 
 /** 案件イメージカラーの初期値（UIアクセントとは別） */
 export const DEFAULT_PROJECT_COLOR =
@@ -148,6 +300,11 @@ export function normalizeProject(
         : "",
 
     tasks: tasksRaw.map(normalizeTask),
+
+    isTutorial:
+      typeof project?.isTutorial === "boolean"
+        ? project.isTutorial
+        : undefined,
   };
 }
 
@@ -161,7 +318,7 @@ export function getProjects(): Project[] {
     typeof window ===
     "undefined"
   ) {
-    return [];
+    return EMPTY_PROJECTS;
   }
 
   const data =
@@ -169,33 +326,47 @@ export function getProjects(): Project[] {
       STORAGE_KEY
     );
 
+  if (data === projectsSnapshotKey) {
+    return projectsSnapshot;
+  }
+
+  projectsSnapshotKey = data;
+
   if (!data) {
-    return [];
+    projectsSnapshot = EMPTY_PROJECTS;
+    return projectsSnapshot;
   }
 
   try {
     const parsed = JSON.parse(data);
 
     if (!Array.isArray(parsed)) {
-      return [];
+      projectsSnapshot = EMPTY_PROJECTS;
+      return projectsSnapshot;
     }
 
-    return parsed.map(normalizeProject);
+    projectsSnapshot = parsed.map(normalizeProject);
+    return projectsSnapshot;
   } catch {
-    return [];
+    projectsSnapshot = EMPTY_PROJECTS;
+    return projectsSnapshot;
   }
 }
 
 export function saveProjects(
   projects: Project[]
 ) {
+  const normalized =
+    projects.map(normalizeProject);
+  const json = JSON.stringify(normalized);
 
   localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify(
-      projects.map(normalizeProject)
-    )
+    json
   );
+
+  projectsSnapshotKey = json;
+  projectsSnapshot = normalized;
 }
 
 export function addProject(
@@ -203,7 +374,7 @@ export function addProject(
 ) {
 
   const projects =
-    getProjects();
+    [...getProjects()];
 
   projects.unshift(
     normalizeProject(project)
@@ -217,7 +388,7 @@ export function updateProject(
 ) {
 
   const projects =
-    getProjects();
+    [...getProjects()];
 
   const normalized =
     normalizeProject(updated);
@@ -242,7 +413,7 @@ export function getShiftTemplates(): ShiftTemplate[] {
     typeof window ===
     "undefined"
   ) {
-    return [];
+    return EMPTY_SHIFT_TEMPLATES;
   }
 
   const data =
@@ -250,25 +421,40 @@ export function getShiftTemplates(): ShiftTemplate[] {
       SHIFT_TEMPLATE_KEY
     );
 
+  if (data === shiftTemplatesSnapshotKey) {
+    return shiftTemplatesSnapshot;
+  }
+
+  shiftTemplatesSnapshotKey = data;
+
   if (!data) {
-    return [];
+    shiftTemplatesSnapshot = EMPTY_SHIFT_TEMPLATES;
+    return shiftTemplatesSnapshot;
   }
 
   try {
-    return JSON.parse(data);
+    shiftTemplatesSnapshot = JSON.parse(data);
+    return shiftTemplatesSnapshot;
   } catch {
-    return [];
+    shiftTemplatesSnapshot = EMPTY_SHIFT_TEMPLATES;
+    return shiftTemplatesSnapshot;
   }
 }
 
 export function saveShiftTemplates(
   templates: ShiftTemplate[]
 ) {
+  const json = JSON.stringify(templates);
 
   localStorage.setItem(
     SHIFT_TEMPLATE_KEY,
-    JSON.stringify(templates)
+    json
   );
+
+  shiftTemplatesSnapshotKey = json;
+  shiftTemplatesSnapshot = templates;
+
+  notifyShiftsChanged();
 }
 
 /* =========================
@@ -281,7 +467,7 @@ export function getShifts(): Shift[] {
     typeof window ===
     "undefined"
   ) {
-    return [];
+    return EMPTY_SHIFTS;
   }
 
   const data =
@@ -289,25 +475,40 @@ export function getShifts(): Shift[] {
       SHIFT_KEY
     );
 
+  if (data === shiftsSnapshotKey) {
+    return shiftsSnapshot;
+  }
+
+  shiftsSnapshotKey = data;
+
   if (!data) {
-    return [];
+    shiftsSnapshot = EMPTY_SHIFTS;
+    return shiftsSnapshot;
   }
 
   try {
-    return JSON.parse(data);
+    shiftsSnapshot = JSON.parse(data);
+    return shiftsSnapshot;
   } catch {
-    return [];
+    shiftsSnapshot = EMPTY_SHIFTS;
+    return shiftsSnapshot;
   }
 }
 
 export function saveShifts(
   shifts: Shift[]
 ) {
+  const json = JSON.stringify(shifts);
 
   localStorage.setItem(
     SHIFT_KEY,
-    JSON.stringify(shifts)
+    json
   );
+
+  shiftsSnapshotKey = json;
+  shiftsSnapshot = shifts;
+
+  notifyShiftsChanged();
 }
 
 /* =========================
@@ -320,7 +521,7 @@ export function getTheme(): ThemeSettings {
     typeof window ===
     "undefined"
   ) {
-    return defaultTheme;
+    return DEFAULT_THEME;
   }
 
   const data =
@@ -328,31 +529,134 @@ export function getTheme(): ThemeSettings {
       THEME_KEY
     );
 
+  if (data === themeSnapshotKey) {
+    return themeSnapshot;
+  }
+
+  themeSnapshotKey = data;
+
   if (!data) {
-    return defaultTheme;
+    themeSnapshot = DEFAULT_THEME;
+    return themeSnapshot;
   }
 
   try {
 
-    return {
+    const parsed = JSON.parse(data);
+
+    themeSnapshot = {
       ...defaultTheme,
-      ...JSON.parse(data),
+      ...parsed,
+      colorMode: normalizeColorMode(
+        parsed.colorMode
+      ),
+      customBackgroundImages:
+        normalizeCustomBackgroundImages(
+          parsed.customBackgroundImages
+        ),
     };
+
+    return themeSnapshot;
 
   } catch {
 
-    return defaultTheme;
+    themeSnapshot = DEFAULT_THEME;
+    return themeSnapshot;
   }
 }
 
 export function saveTheme(
   theme: ThemeSettings
 ) {
+  const normalized: ThemeSettings = {
+    ...defaultTheme,
+    ...theme,
+    colorMode: normalizeColorMode(
+      theme.colorMode
+    ),
+    customBackgroundImages:
+      normalizeCustomBackgroundImages(
+        theme.customBackgroundImages
+      ),
+  };
+
+  const json = JSON.stringify(normalized);
 
   localStorage.setItem(
     THEME_KEY,
-    JSON.stringify(theme)
+    json
   );
+
+  themeSnapshotKey = json;
+  themeSnapshot = normalized;
+
+  applyColorModeClass(
+    normalized.colorMode
+  );
+  notifyThemeChange(normalized);
+}
+
+/* =========================
+   Onboarding
+========================= */
+
+export function getOnboarding(): OnboardingSettings {
+
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return defaultOnboarding;
+  }
+
+  const data =
+    localStorage.getItem(
+      ONBOARDING_KEY
+    );
+
+  if (data === onboardingSnapshotKey) {
+    return onboardingSnapshot;
+  }
+
+  onboardingSnapshotKey = data;
+
+  if (!data) {
+    onboardingSnapshot = defaultOnboarding;
+    return onboardingSnapshot;
+  }
+
+  try {
+    const parsed = JSON.parse(data);
+
+    onboardingSnapshot = {
+      ...defaultOnboarding,
+      ...parsed,
+    };
+
+    return onboardingSnapshot;
+  } catch {
+    onboardingSnapshot = defaultOnboarding;
+    return onboardingSnapshot;
+  }
+}
+
+export function saveOnboarding(
+  settings: OnboardingSettings
+) {
+  const json = JSON.stringify(settings);
+
+  localStorage.setItem(
+    ONBOARDING_KEY,
+    json
+  );
+
+  onboardingSnapshotKey = json;
+  onboardingSnapshot = {
+    ...defaultOnboarding,
+    ...settings,
+  };
+
+  notifyOnboardingChanged();
 }
 
 /* =========================
@@ -442,28 +746,29 @@ export function exportBackup() {
 ========================= */
 
 function isValidBackupData(
-  data: any
+  data: unknown
 ): data is BackupData {
+  const d = data as Record<string, unknown> | null;
 
   return (
-    typeof data ===
+    typeof d ===
       "object" &&
 
-    data !== null &&
+    d !== null &&
 
-    typeof data.version ===
+    typeof d.version ===
       "number" &&
 
     Array.isArray(
-      data.projects
+      d.projects
     ) &&
 
     Array.isArray(
-      data.shifts
+      d.shifts
     ) &&
 
     Array.isArray(
-      data.shiftTemplates
+      d.shiftTemplates
     )
   );
 }
@@ -516,6 +821,13 @@ export async function importBackupFile(
       saveTheme({
         ...defaultTheme,
         ...parsed.theme,
+        colorMode: normalizeColorMode(
+          parsed.theme.colorMode
+        ),
+        customBackgroundImages:
+          normalizeCustomBackgroundImages(
+            parsed.theme.customBackgroundImages
+          ),
       });
     }
 
@@ -556,4 +868,15 @@ export function clearAllData() {
   localStorage.removeItem(
     THEME_KEY
   );
+
+  localStorage.removeItem(
+    ONBOARDING_KEY
+  );
+
+  invalidateStorageSnapshots();
+  endTutorialSession();
+  notifyShiftsChanged();
+  applyColorModeClass(DEFAULT_THEME.colorMode);
+  notifyThemeChange(DEFAULT_THEME);
+  notifyOnboardingChanged();
 }

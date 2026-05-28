@@ -9,11 +9,10 @@ import { theme } from "@/lib/themeClasses";
 
 import {
   DEFAULT_PROJECT_COLOR,
-  getProjects,
-  saveProjects,
   type Project,
   type Task,
 } from "@/lib/storage";
+import { getProjectsRepo, saveProjectsRepo } from "@/lib/projectsRepo";
 
 export default function CreatePage() {
   const router = useRouter();
@@ -52,7 +51,7 @@ export default function CreatePage() {
       return;
     }
 
-    const projects = getProjects();
+    const projects = getProjectsRepo();
 
     const taskList: Task[] = tasks
       .filter((task) => task.trim())
@@ -72,7 +71,7 @@ export default function CreatePage() {
       tasks: taskList,
     };
 
-    saveProjects([
+    saveProjectsRepo([
       ...projects,
       newProject,
     ]);
@@ -92,7 +91,7 @@ export default function CreatePage() {
 
           {/* タイトル */}
           <div>
-            <p className="mb-2 text-sm text-zinc-500">
+            <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               タイトル
             </p>
 
@@ -106,8 +105,8 @@ export default function CreatePage() {
               className="
                 w-full
                 rounded-[24px]
-                border border-zinc-200
-                bg-white
+                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
+                bg-white dark:bg-zinc-900 dark:bg-zinc-900
                 px-5
                 py-4
                 text-sm
@@ -118,7 +117,7 @@ export default function CreatePage() {
 
           {/* 納期 */}
           <div>
-            <p className="mb-2 text-sm text-zinc-500">
+            <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               納期
             </p>
 
@@ -131,8 +130,8 @@ export default function CreatePage() {
               className="
                 w-full
                 rounded-[24px]
-                border border-zinc-200
-                bg-white
+                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
+                bg-white dark:bg-zinc-900 dark:bg-zinc-900
                 px-5
                 py-4
                 text-sm
@@ -143,7 +142,7 @@ export default function CreatePage() {
 
           {/* 工程 */}
           <div>
-            <p className="mb-2 text-sm text-zinc-500">
+            <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
               工程
             </p>
 
@@ -164,8 +163,8 @@ export default function CreatePage() {
                   className="
                     w-full
                     rounded-[20px]
-                    border border-zinc-200
-                    bg-white
+                    border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
+                    bg-white dark:bg-zinc-900 dark:bg-zinc-900
                     px-4
                     py-3
                     text-sm
@@ -182,7 +181,7 @@ export default function CreatePage() {
                   border border-dashed border-zinc-300
                   py-3
                   text-sm
-                  text-zinc-500
+                  text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
                 "
               >
                 ＋ 工程追加

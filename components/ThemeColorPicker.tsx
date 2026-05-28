@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useState,
 } from "react";
 
@@ -11,6 +10,7 @@ import {
   parseColorInput,
   rgbToHex,
 } from "@/lib/colorFormat";
+import { appSurfaces } from "@/lib/appSurfaces";
 
 type ThemeColorPickerProps = {
   label: string;
@@ -19,17 +19,7 @@ type ThemeColorPickerProps = {
   onChange: (hex: string) => void;
 };
 
-const inputClass = `
-  w-full
-  rounded-2xl
-  border border-zinc-200
-  bg-white
-  px-4
-  py-3
-  text-sm
-  text-zinc-700
-  outline-none
-`;
+const inputClass = `${appSurfaces.input} px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200`;
 
 export default function ThemeColorPicker({
   label,
@@ -58,23 +48,6 @@ export default function ThemeColorPicker({
 
   const [customOpen, setCustomOpen] =
     useState(false);
-
-  useEffect(() => {
-    const hex =
-      normalizeHex(value) ?? value;
-
-    setHexInput(hex);
-
-    const rgb = hexToRgb(hex);
-
-    if (rgb) {
-      setR(rgb.r);
-      setG(rgb.g);
-      setB(rgb.b);
-    }
-
-    setHexError("");
-  }, [value]);
 
   function applyColor(hex: string) {
     onChange(hex);
@@ -111,17 +84,9 @@ export default function ThemeColorPicker({
 
   return (
     <div
-      className="
-        mb-6
-        rounded-[30px]
-        border border-white/60
-        bg-white/75
-        p-5
-        backdrop-blur-xl
-        shadow-[0_8px_30px_rgba(0,0,0,0.05)]
-      "
+      className={`mb-6 p-5 ${appSurfaces.card}`}
     >
-      <p className="mb-4 text-sm text-zinc-400">
+      <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
         {label}
       </p>
 

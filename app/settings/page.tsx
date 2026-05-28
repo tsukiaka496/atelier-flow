@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
-
 import {
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -11,14 +8,22 @@ import {
 import {
   clearAllData,
   exportBackup,
-  getTheme,
   importBackupFile,
   saveTheme,
+  type ThemeSettings,
 } from "@/lib/storage";
 
 import ThemedMain from "@/components/ThemedMain";
+import BottomNav from "@/components/BottomNav";
+import BackgroundImagePicker from "@/components/BackgroundImagePicker";
+import ColorModeToggle from "@/components/ColorModeToggle";
 import ThemeColorPicker from "@/components/ThemeColorPicker";
-import { theme } from "@/lib/themeClasses";
+import type { ColorMode } from "@/lib/colorMode";
+import { appSurfaces } from "@/lib/appSurfaces";
+import {
+  normalizeCustomBackgroundImages,
+} from "@/lib/themeBackgrounds";
+import { useThemeSettings } from "@/lib/useThemeSettings";
 
 const backgroundColors = [
   "#f7f7f5",
@@ -36,14 +41,8 @@ const accentColors = [
   "#f59e0b",
 ];
 
-const backgroundImages = [
-  "",
-  "/backgrounds/bg1.jpg",
-  "/backgrounds/bg2.jpg",
-  "/backgrounds/bg3.jpg",
-];
-
 export default function SettingsPage() {
+  const theme = useThemeSettings();
 
   const fileInputRef =
     useRef<HTMLInputElement>(
@@ -53,58 +52,22 @@ export default function SettingsPage() {
   const [message, setMessage] =
     useState("");
 
-  const [background, setBackground] =
-    useState("#f7f7f5");
-
-  const [accent, setAccent] =
-    useState("#38bdf8");
-
-  const [
-    backgroundImage,
-    setBackgroundImage,
-  ] = useState("");
-
-  useEffect(() => {
-
-    const theme =
-      getTheme();
-
-    setBackground(
-      theme.background
-    );
-
-    setAccent(
-      theme.accent
-    );
-
-    setBackgroundImage(
-      theme.backgroundImage
-    );
-
-  }, []);
-
   function saveCurrentTheme(
-    newBackground: string,
-    newAccent: string,
-    newBackgroundImage: string
+    updates: Partial<ThemeSettings>
   ) {
-
     saveTheme({
-      background:
-        newBackground,
-
-      accent:
-        newAccent,
-
-      backgroundImage:
-        newBackgroundImage,
+      ...theme,
+      ...updates,
     });
+  }
+
+  function changeColorMode(mode: ColorMode) {
+    saveCurrentTheme({ colorMode: mode });
   }
 
   async function handleImport(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
-
     const file =
       e.target.files?.[0];
 
@@ -133,7 +96,6 @@ export default function SettingsPage() {
     if (
       result.success
     ) {
-
       setTimeout(() => {
         location.reload();
       }, 1000);
@@ -141,7 +103,6 @@ export default function SettingsPage() {
   }
 
   function handleExport() {
-
     exportBackup();
 
     setMessage(
@@ -150,7 +111,6 @@ export default function SettingsPage() {
   }
 
   function handleClear() {
-
     const confirmed =
       window.confirm(
         "本当に全データを削除しますか？"
@@ -171,61 +131,47 @@ export default function SettingsPage() {
     }, 1000);
   }
 
+  const customBackgroundImages =
+    normalizeCustomBackgroundImages(
+      theme.customBackgroundImages
+    );
+
   return (
-
-    <ThemedMain
-      className="px-5 py-6 pb-32"
-      background={background}
-      backgroundImage={backgroundImage}
-      accent={accent}
-    >
-
+    <ThemedMain className="px-5 py-6 pb-32">
       <div className="mx-auto max-w-md">
-
-        <div className="mb-6">
-
-          <p className="text-sm text-zinc-400">
+        <div
+          className="mb-6"
+          data-tour="settings-guide"
+        >
+          <p className={appSurfaces.mutedLabel}>
             application settings
           </p>
 
-          <h1 className="mt-1 text-2xl font-semibold tracking-wide">
+          <h1 className={`mt-1 ${appSurfaces.pageTitle}`}>
             設定
           </h1>
-
         </div>
 
         {message && (
-
           <div
             className="mb-5 rounded-2xl px-4 py-3 text-sm text-white"
             style={{
               background:
-                accent,
+                theme.accent,
             }}
           >
             {message}
           </div>
-
         )}
 
         <div
-          className="
-            mb-6
-            rounded-[30px]
-            border border-white/60
-            bg-white/75
-            p-5
-            backdrop-blur-xl
-            shadow-[0_8px_30px_rgba(0,0,0,0.05)]
-          "
+          className={`mb-6 p-5 ${appSurfaces.card}`}
         >
-
-          <p className="mb-4 text-sm text-zinc-400">
+          <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
             バックアップ
           </p>
 
           <div className="space-y-3">
-
             <button
               onClick={
                 handleExport
@@ -240,7 +186,7 @@ export default function SettingsPage() {
               "
               style={{
                 background:
-                  accent,
+                  theme.accent,
               }}
             >
               JSONを書き出す
@@ -273,119 +219,68 @@ export default function SettingsPage() {
               }
               className="hidden"
             />
-
           </div>
-
         </div>
-
-        <ThemeColorPicker
-          label="背景色"
-          value={background}
-          presets={backgroundColors}
-          onChange={(color) => {
-            setBackground(color);
-            saveCurrentTheme(
-              color,
-              accent,
-              backgroundImage
-            );
-          }}
-        />
-
-        <ThemeColorPicker
-          label="ハイライト色"
-          value={accent}
-          presets={accentColors}
-          onChange={(color) => {
-            setAccent(color);
-            saveCurrentTheme(
-              background,
-              color,
-              backgroundImage
-            );
-          }}
-        />
 
         <div
-          className="
-            mb-6
-            rounded-[30px]
-            border border-white/60
-            bg-white/75
-            p-5
-            backdrop-blur-xl
-            shadow-[0_8px_30px_rgba(0,0,0,0.05)]
-          "
+          className={`mb-6 p-5 ${appSurfaces.card}`}
         >
-
-          <p className="mb-4 text-sm text-zinc-400">
-            背景画像
+          <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
+            表示
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <p className={`mb-3 text-xs ${appSurfaces.subtleText}`}>
+            カラーモード
+          </p>
 
-            {backgroundImages.map(
-              (image, index) => (
-
-                <button
-                  key={index}
-                  onClick={() => {
-
-                    setBackgroundImage(
-                      image
-                    );
-
-                    saveCurrentTheme(
-                      background,
-                      accent,
-                      image
-                    );
-                  }}
-                  className="
-                    overflow-hidden
-                    rounded-2xl
-                    border border-zinc-200
-                    bg-white
-                  "
-                >
-
-                  {image ? (
-
-                    <img
-                      src={image}
-                      alt=""
-                      className="
-                        h-24
-                        w-full
-                        object-cover
-                      "
-                    />
-
-                  ) : (
-
-                    <div
-                      className="
-                        flex
-                        h-24
-                        items-center
-                        justify-center
-                        text-sm
-                        text-zinc-400
-                      "
-                    >
-                      なし
-                    </div>
-
-                  )}
-
-                </button>
-
-              )
-            )}
-
-          </div>
-
+          <ColorModeToggle
+            value={theme.colorMode ?? "light"}
+            onChange={changeColorMode}
+          />
         </div>
+
+        <ThemeColorPicker
+          key={`bg-${theme.background}`}
+          label="背景色"
+          value={theme.background}
+          presets={backgroundColors}
+          onChange={(color) => {
+            saveCurrentTheme({
+              background: color,
+            });
+          }}
+        />
+
+        <ThemeColorPicker
+          key={`accent-${theme.accent}`}
+          label="ハイライト色"
+          value={theme.accent}
+          presets={accentColors}
+          onChange={(color) => {
+            saveCurrentTheme({
+              accent: color,
+            });
+          }}
+        />
+
+        <BackgroundImagePicker
+          theme={{
+            background: theme.background,
+            accent: theme.accent,
+            backgroundImage: theme.backgroundImage,
+            customBackgroundImages,
+          }}
+          onChange={(next) => {
+            saveCurrentTheme({
+              backgroundImage:
+                next.backgroundImage,
+              customBackgroundImages:
+                normalizeCustomBackgroundImages(
+                  next.customBackgroundImages
+                ),
+            });
+          }}
+        />
 
         <div
           className="
@@ -393,10 +288,11 @@ export default function SettingsPage() {
             border border-red-100
             bg-red-50/70
             p-5
+            dark:border-red-900/40
+            dark:bg-red-950/40
           "
         >
-
-          <p className="mb-2 text-sm text-red-400">
+          <p className="mb-2 text-sm text-red-400 dark:text-red-300">
             danger zone
           </p>
 
@@ -416,62 +312,10 @@ export default function SettingsPage() {
           >
             全データ削除
           </button>
-
         </div>
-
       </div>
 
-      <div
-        className="
-          fixed
-          bottom-5
-          left-1/2
-          flex
-          w-[92%]
-          max-w-md
-          -translate-x-1/2
-          items-center
-          justify-between
-          rounded-[30px]
-          border border-white/60
-          bg-white/70
-          px-6
-          py-4
-          backdrop-blur-xl
-          shadow-[0_8px_30px_rgba(0,0,0,0.08)]
-        "
-      >
-
-        <Link
-          href="/"
-          className="text-sm text-zinc-500"
-        >
-          ホーム
-        </Link>
-
-        <Link
-          href="/projects"
-          className="text-sm text-zinc-500"
-        >
-          案件
-        </Link>
-
-        <Link
-          href="/month"
-          className="text-sm text-zinc-500"
-        >
-          月
-        </Link>
-
-        <Link
-          href="/settings"
-          className={theme.navActive}
-        >
-          設定
-        </Link>
-
-      </div>
-
+      <BottomNav />
     </ThemedMain>
   );
 }

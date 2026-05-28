@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import {
-  getProjects,
-  saveProjects,
   type Task,
 } from "@/lib/storage";
+import { getProjectsRepo, saveProjectsRepo } from "@/lib/projectsRepo";
 import { theme } from "@/lib/themeClasses";
 
 export default function AddTaskForm() {
-  const projects = getProjects();
+  const projects = getProjectsRepo();
 
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] =
@@ -36,7 +35,7 @@ export default function AddTaskForm() {
       };
     });
 
-    saveProjects(updated);
+    saveProjectsRepo(updated);
     setTitle("");
   }
 
@@ -69,7 +68,7 @@ export default function AddTaskForm() {
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="タスク追加"
+        placeholder="例: 仕上げ"
         className="
           w-full
           rounded-[16px]

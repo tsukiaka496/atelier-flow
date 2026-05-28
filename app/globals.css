@@ -1,12 +1,23 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #09090b;
+  --background: #f7f7f5;
+  --card: #ffffff;
+  --border: #e4e4e7;
+  --text: #27272a;
+  --muted: #71717a;
+  --accent: #7dd3fc;
+}
+
+.dark {
+  --background: #111113;
   --card: #18181b;
-  --border: #27272a;
+  --border: #3f3f46;
   --text: #fafafa;
   --muted: #a1a1aa;
-  --accent: #7dd3fc;
+  color-scheme: dark;
 }
 
 * {
@@ -18,4 +29,128 @@ body {
   background: var(--background);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+html.tutorial-active {
+  overscroll-behavior: contain;
+}
+
+[data-tour="create-project"],
+[data-tour="tutorial-fill-example"],
+[data-tour="month-template-add"] {
+  scroll-margin-top: 96px;
+  scroll-margin-bottom: 32px;
+}
+
+@keyframes tutorial-mask-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes tutorial-tooltip-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.tutorial-mask-nudge {
+  animation: tutorial-mask-pulse 0.35s ease-in-out;
+}
+
+.tutorial-tooltip-nudge {
+  animation: tutorial-tooltip-shake 0.35s ease-in-out;
+}
+
+.tutorial-overlay-enter {
+  animation: tutorial-overlay-fade 0.18s ease-out;
+}
+
+@keyframes tutorial-overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tutorial-tooltip-panel {
+  transition:
+    top 0.18s ease,
+    left 0.18s ease,
+    width 0.18s ease;
+}
+
+.tutorial-overlay-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.tutorial-mask-surface {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.tutorial-overlay-completing {
+  animation: tutorial-overlay-complete 0.6s ease forwards;
+}
+
+.tutorial-backdrop-complete {
+  animation: tutorial-backdrop-lighten 0.6s ease forwards;
+}
+
+@keyframes tutorial-overlay-complete {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes tutorial-backdrop-lighten {
+  from {
+    background-color: rgba(0, 0, 0, 0.35);
+  }
+  to {
+    background-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-mask-nudge {
+    animation: none;
+  }
+
+  .tutorial-tooltip-nudge {
+    animation: none;
+  }
+
+  .tutorial-overlay-enter {
+    animation: none;
+  }
+
+  .tutorial-tooltip-panel {
+    transition: none;
+  }
+
+  .tutorial-overlay-completing,
+  .tutorial-backdrop-complete {
+    animation: none;
+  }
 }

@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import {
   useEffect,
   useMemo,
@@ -9,8 +7,6 @@ import {
 } from "react";
 
 import {
-  getShiftTemplates,
-  getShifts,
   saveShiftTemplates,
   saveShifts,
   Shift,
@@ -18,7 +14,30 @@ import {
 } from "@/lib/storage";
 
 import ThemedMain from "@/components/ThemedMain";
+import BottomNav from "@/components/BottomNav";
+import HintLabel from "@/components/onboarding/HintLabel";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
+import {
+  registerTutorialHook,
+  registerTutorialReadyCheck,
+} from "@/lib/tutorialActionRegistry";
+import { isTutorialSessionActive } from "@/lib/tutorialSession";
+import {
+  createTutorialShiftTemplate,
+  hasTutorialShiftTemplate,
+  TUTORIAL_SHIFT_TEMPLATE_ID,
+} from "@/lib/tutorialShiftTemplate";
 import { theme } from "@/lib/themeClasses";
+import { appSurfaces } from "@/lib/appSurfaces";
+import { useTourAction } from "@/lib/useTourAction";
+import {
+  useShifts,
+  useShiftTemplates,
+} from "@/lib/useShiftData";
+import {
+  tourInstanceProps,
+  useTourInstanceId,
+} from "@/lib/useTourInstanceId";
 
 function formatDate(date: Date) {
   const year =
@@ -78,6 +97,16 @@ function getMonthDates(
 }
 
 export default function MonthPage() {
+  const { bumpTutorialReady } = useOnboarding();
+  const triggerEditToggle = useTourAction("month-edit-toggle");
+  const triggerCalendarDay = useTourAction("month-calendar-day");
+  const editToggleInstance = useTourInstanceId(
+    "month-edit-toggle"
+  );
+  const templateAddInstance = useTourInstanceId(
+    "month-template-add"
+  );
+
   const today = new Date();
 
   const [currentDate, setCurrentDate] =
@@ -89,16 +118,8 @@ export default function MonthPage() {
       )
     );
 
-  const [templates, setTemplates] =
-    useState<ShiftTemplate[]>([]);
-
-  const [shifts, setShifts] =
-    useState<Shift[]>([]);
-
-  const [
-    selectedTemplateId,
-    setSelectedTemplateId,
-  ] = useState("");
+  const templates = useShiftTemplates();
+  const shifts = useShifts();
 
   const [name, setName] =
     useState("");
@@ -112,25 +133,13 @@ export default function MonthPage() {
   const [editMode, setEditMode] =
     useState(false);
 
-  useEffect(() => {
-    const savedTemplates =
-      getShiftTemplates();
+  const [selectedTemplateId, setSelectedTemplateId] =
+    useState("");
 
-    const savedShifts =
-      getShifts();
-
-    setTemplates(savedTemplates);
-
-    setShifts(savedShifts);
-
-    if (
-      savedTemplates.length > 0
-    ) {
-      setSelectedTemplateId(
-        savedTemplates[0].id
-      );
-    }
-  }, []);
+  const activeTemplateId =
+    selectedTemplateId ||
+    templates[0]?.id ||
+    "";
 
   const dates = useMemo(
     () =>
@@ -141,44 +150,113 @@ export default function MonthPage() {
     [currentDate]
   );
 
-  function addTemplate() {
-    if (
-      !name ||
-      !start ||
-      !end
-    ) {
+  useEffect(() => {
+    return registerTutorialReadyCheck(
+      "month-edit-mode-on",
+      () => editMode
+    );
+  }, [editMode]);
+
+  useEffect(() => {
+    return registerTutorialReadyCheck(
+      "month-template-added",
+      () => {
+        if (hasTutorialShiftTemplate(templates)) {
+          return true;
+        }
+
+        if (
+          isTutorialSessionActive() &&
+          templates.length > 0
+        ) {
+          return true;
+        }
+
+        return false;
+      }
+    );
+  }, [templates]);
+
+  useEffect(() => {
+    return registerTutorialHook(
+      "month-template-prepare",
+      () => {
+        setName("仕事");
+        setStart("10:00");
+        setEnd("18:00");
+      }
+    );
+  }, []);
+
+  useEffect(() => {
+    bumpTutorialReady();
+  }, [editMode, templates, bumpTutorialReady]);
+
+  function addTutorialShiftTemplate() {
+    if (hasTutorialShiftTemplate(templates)) {
+      setSelectedTemplateId(
+        TUTORIAL_SHIFT_TEMPLATE_ID
+      );
+      requestAnimationFrame(() => {
+        bumpTutorialReady();
+      });
       return;
     }
 
-    const newTemplate: ShiftTemplate =
-      {
-        id: crypto.randomUUID(),
-        name,
-        start,
-        end,
-      };
+    const sample = createTutorialShiftTemplate();
+    const updatedTemplates = [
+      ...templates,
+      sample,
+    ];
+
+    saveShiftTemplates(updatedTemplates);
+    setSelectedTemplateId(sample.id);
+    setName("");
+    setStart("");
+    setEnd("");
+    requestAnimationFrame(() => {
+      bumpTutorialReady();
+    });
+  }
+
+  function addTemplateFromForm() {
+    if (!name || !start || !end) {
+      return;
+    }
+
+    const newTemplate: ShiftTemplate = {
+      id: crypto.randomUUID(),
+      name,
+      start,
+      end,
+    };
 
     const updatedTemplates = [
       ...templates,
       newTemplate,
     ];
 
-    setTemplates(
-      updatedTemplates
-    );
-
-    saveShiftTemplates(
-      updatedTemplates
-    );
-
-    setSelectedTemplateId(
-      newTemplate.id
-    );
-
+    saveShiftTemplates(updatedTemplates);
+    setSelectedTemplateId(newTemplate.id);
     setName("");
     setStart("");
     setEnd("");
+    requestAnimationFrame(() => {
+      bumpTutorialReady();
+    });
   }
+
+  const handleAddTemplate = useTourAction(
+    "month-template-add",
+    () => {
+      if (name && start && end) {
+        addTemplateFromForm();
+        return;
+      }
+
+      addTutorialShiftTemplate();
+    }
+  );
 
   function deleteTemplate(
     templateId: string
@@ -217,12 +295,6 @@ export default function MonthPage() {
           templateId
       );
 
-    setTemplates(
-      updatedTemplates
-    );
-
-    setShifts(updatedShifts);
-
     saveShiftTemplates(
       updatedTemplates
     );
@@ -230,7 +302,7 @@ export default function MonthPage() {
     saveShifts(updatedShifts);
 
     if (
-      selectedTemplateId ===
+      activeTemplateId ===
       templateId
     ) {
       setSelectedTemplateId(
@@ -244,7 +316,7 @@ export default function MonthPage() {
     date: string
   ) {
     if (
-      !selectedTemplateId
+      !activeTemplateId
     ) {
       return;
     }
@@ -274,12 +346,10 @@ export default function MonthPage() {
         {
           date,
           templateId:
-            selectedTemplateId,
+            activeTemplateId,
         },
       ];
     }
-
-    setShifts(updatedShifts);
 
     saveShifts(updatedShifts);
   }
@@ -332,17 +402,16 @@ export default function MonthPage() {
 
   return (
     <ThemedMain className="px-5 py-6 pb-32">
-
       <div className="mx-auto max-w-md">
 
         {/* タイトル */}
         <div className="mb-6">
 
-          <p className="text-sm text-zinc-400">
+          <p className={appSurfaces.mutedLabel}>
             work schedule
           </p>
 
-          <h1 className="mt-1 text-2xl font-semibold tracking-wide">
+          <h1 className={`mt-1 ${appSurfaces.pageTitle}`}>
             月表示
           </h1>
 
@@ -355,75 +424,25 @@ export default function MonthPage() {
             onClick={
               previousMonth
             }
-            className="
-              rounded-full
-              bg-white
-              px-4
-              py-2
-              text-sm
-              text-zinc-500
-              shadow-[0_2px_10px_rgba(0,0,0,0.05)]
-            "
+            className={appSurfaces.roundButtonMd}
           >
             ←
           </button>
 
-          <p className="text-lg font-semibold">
+          <p className={`text-lg font-semibold ${appSurfaces.bodyText}`}>
             {currentMonthText}
           </p>
 
           <button
             onClick={nextMonth}
-            className="
-              rounded-full
-              bg-white
-              px-4
-              py-2
-              text-sm
-              text-zinc-500
-              shadow-[0_2px_10px_rgba(0,0,0,0.05)]
-            "
+            className={appSurfaces.roundButtonMd}
           >
             →
           </button>
 
         </div>
 
-        {/* 編集ボタン */}
-        <div className="mb-4 flex justify-end">
-
-          <button
-            onClick={() =>
-              setEditMode(
-                !editMode
-              )
-            }
-            className={`
-              rounded-full
-              px-4
-              py-2
-              text-xs
-              transition-all
-
-              ${
-                editMode
-                  ? `
-                    ${theme.bgSoft}
-                    ${theme.text}
-                  `
-                  : `
-                    bg-white
-                    text-zinc-500
-                  `
-              }
-            `}
-          >
-            {editMode
-              ? "編集モードON"
-              : "編集"}
-          </button>
-
-        </div>
+        <div className="h-2" />
 
         {/* 曜日 */}
         <div className="mb-2 grid grid-cols-7 gap-2">
@@ -454,7 +473,11 @@ export default function MonthPage() {
         </div>
 
         {/* カレンダー */}
-        <div className="mb-6 grid grid-cols-7 gap-2">
+        <HintLabel hintId="month-calendar">
+        <div
+          className="mb-6 grid grid-cols-7 gap-2"
+          data-tour="month-calendar"
+        >
 
           {dates.map(
             (date, index) => {
@@ -494,11 +517,15 @@ export default function MonthPage() {
 
                 <button
                   key={dateString}
-                  onClick={() =>
-                    toggleShift(
-                      dateString
-                    )
-                  }
+                  data-tour-day={dateString}
+                  data-tour-instance-id={`month-day-${dateString}`}
+                  onClick={() => {
+                    toggleShift(dateString);
+
+                    if (editMode) {
+                      triggerCalendarDay();
+                    }
+                  }}
                   className={`
                     aspect-square
                     rounded-[22px]
@@ -513,10 +540,7 @@ export default function MonthPage() {
                           ${theme.border}
                           ${theme.bgSoft}
                         `
-                        : `
-                          border-zinc-200
-                          bg-white
-                        `
+                        : appSurfaces.monthDayIdle
                     }
 
                     ${
@@ -555,7 +579,7 @@ export default function MonthPage() {
 
                     <div className="mt-2">
 
-                      <p className="text-[10px] text-zinc-700">
+                      <p className="text-[10px] text-zinc-700 dark:text-zinc-300">
                         仕事
                       </p>
 
@@ -576,18 +600,11 @@ export default function MonthPage() {
           )}
 
         </div>
+        </HintLabel>
 
         {/* テンプレ */}
         <div
-          className="
-            mb-5
-            rounded-[28px]
-            border border-white/60
-            bg-white/75
-            p-4
-            backdrop-blur-xl
-            shadow-[0_8px_30px_rgba(0,0,0,0.05)]
-          "
+          className={`mb-5 p-4 ${appSurfaces.cardSm}`}
         >
 
           <div className="mb-3 flex items-center justify-between">
@@ -597,7 +614,12 @@ export default function MonthPage() {
             </p>
 
             <button
-              onClick={addTemplate}
+              type="button"
+              {...tourInstanceProps(
+                "month-template-add",
+                templateAddInstance
+              )}
+              onClick={handleAddTemplate}
               className={`
                 rounded-full
                 ${theme.bgSoft}
@@ -620,16 +642,8 @@ export default function MonthPage() {
                   e.target.value
                 )
               }
-              placeholder="夕勤"
-              className="
-                w-full
-                rounded-2xl
-                border border-zinc-200
-                bg-white
-                px-4
-                py-3
-                text-sm
-              "
+              placeholder="例: 夕勤"
+              className={appSurfaces.input}
             />
 
             <div className="flex gap-3">
@@ -642,15 +656,7 @@ export default function MonthPage() {
                     e.target.value
                   )
                 }
-                className="
-                  flex-1
-                  rounded-2xl
-                  border border-zinc-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                "
+                className={`flex-1 px-4 py-3 text-sm ${appSurfaces.input}`}
               />
 
               <input
@@ -661,15 +667,7 @@ export default function MonthPage() {
                     e.target.value
                   )
                 }
-                className="
-                  flex-1
-                  rounded-2xl
-                  border border-zinc-200
-                  bg-white
-                  px-4
-                  py-3
-                  text-sm
-                "
+                className={`flex-1 px-4 py-3 text-sm ${appSurfaces.input}`}
               />
 
             </div>
@@ -695,16 +693,13 @@ export default function MonthPage() {
                   transition-all
 
                   ${
-                    selectedTemplateId ===
+                    activeTemplateId ===
                     template.id
                       ? `
                         ${theme.border}
                         ${theme.bgSoft}
                       `
-                      : `
-                        border-zinc-200
-                        bg-white
-                      `
+                      : appSurfaces.panelIdle
                   }
                 `}
               >
@@ -758,56 +753,54 @@ export default function MonthPage() {
 
       </div>
 
-      {/* 下バー */}
+      <BottomNav />
+
+      {/* 編集トグル（片手操作向け） */}
       <div
         className="
+          pointer-events-none
           fixed
-          bottom-5
+          bottom-[92px]
           left-1/2
-          flex
+          z-40
           w-[92%]
           max-w-md
           -translate-x-1/2
-          items-center
-          justify-between
-          rounded-[30px]
-          border border-white/60
-          bg-white/70
-          px-6
-          py-4
-          backdrop-blur-xl
-          shadow-[0_8px_30px_rgba(0,0,0,0.08)]
         "
       >
+        <div className="pointer-events-auto flex justify-end">
+          <button
+            type="button"
+            {...tourInstanceProps(
+              "month-edit-toggle",
+              editToggleInstance
+            )}
+            onClick={() => {
+              const next = !editMode;
+              setEditMode(next);
 
-        <Link
-          href="/"
-          className="text-sm text-zinc-500"
-        >
-          ホーム
-        </Link>
+              if (next) {
+                triggerEditToggle();
+              }
+            }}
+            className={`
+              rounded-full
+              px-5
+              py-3
+              text-sm
+              shadow-[0_10px_30px_rgba(0,0,0,0.16)]
+              transition-all
 
-        <Link
-          href="/projects"
-          className="text-sm text-zinc-500"
-        >
-          案件
-        </Link>
-
-        <Link
-          href="/month"
-          className={theme.navActive}
-        >
-          月
-        </Link>
-
-        <Link
-  href="/settings"
-  className="text-sm text-zinc-500"
->
-  設定
-</Link>
-
+              ${
+                editMode
+                  ? `${theme.btnSolid}`
+                  : `${appSurfaces.editToggleIdle}`
+              }
+            `}
+          >
+            {editMode ? "編集ON" : "編集する"}
+          </button>
+        </div>
       </div>
 
     </ThemedMain>

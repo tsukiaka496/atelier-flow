@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import {
-  useEffect,
   useState,
 } from "react";
 
@@ -13,37 +12,46 @@ import {
 } from "next/navigation";
 
 import {
-  getProjects,
-  saveProjects,
   Project,
 } from "@/lib/storage";
+import { getProjectsRepo, saveProjectsRepo } from "@/lib/projectsRepo";
 
 import ThemedMain from "@/components/ThemedMain";
+import BottomNav from "@/components/BottomNav";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
+import { theme } from "@/lib/themeClasses";
+import { appSurfaces } from "@/lib/appSurfaces";
+import { useTourAction } from "@/lib/useTourAction";
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const { setTutorialModalOpen } = useOnboarding();
+  const triggerTaskToggle = useTourAction("project-task-toggle");
+  const triggerTaskEdit = useTourAction("project-task-edit");
+  const triggerTaskSave = useTourAction("project-task-save");
 
   const router = useRouter();
 
   const [project, setProject] =
-    useState<Project | null>(null);
+    useState<Project | null>(() => {
+      const id = String(params.id);
+      const projects = getProjectsRepo();
+      return projects.find((p) => p.id === id) ?? null;
+    });
 
-  useEffect(() => {
-    const projects = getProjects();
+  const [editingTaskId, setEditingTaskId] =
+    useState<string | null>(null);
 
-    const found = projects.find(
-      (p) => p.id === params.id
-    );
+  const [editTitle, setEditTitle] =
+    useState("");
 
-    if (found) {
-      setProject(found);
-    }
-  }, [params.id]);
+  const [editDate, setEditDate] =
+    useState("");
 
   if (!project) {
     return (
       <ThemedMain className="p-6">
-        <p className="text-zinc-400">
+        <p className="text-zinc-400 dark:text-zinc-500">
           読み込み中...
         </p>
       </ThemedMain>
@@ -151,7 +159,7 @@ export default function ProjectDetailPage() {
         ),
     };
 
-    const projects = getProjects();
+    const projects = getProjectsRepo();
 
     const updatedProjects =
       projects.map((p) =>
@@ -160,9 +168,75 @@ export default function ProjectDetailPage() {
           : p
       );
 
-    saveProjects(updatedProjects);
+    saveProjectsRepo(updatedProjects);
 
     setProject(updatedProject);
+  }
+
+  function openTaskEditor(taskId: string) {
+    const task =
+      currentProject.tasks.find((t) => t.id === taskId) ??
+      null;
+    if (!task) return;
+
+    setEditingTaskId(taskId);
+    setEditTitle(task.title);
+    setEditDate(task.date);
+    setTutorialModalOpen(true);
+  }
+
+  function closeTaskEditor() {
+    setEditingTaskId(null);
+    setEditTitle("");
+    setEditDate("");
+    setTutorialModalOpen(false);
+  }
+
+  function saveTaskEdits() {
+    if (!editingTaskId) return;
+
+    const updatedProject: Project = {
+      ...currentProject,
+      tasks: currentProject.tasks.map((t) => {
+        if (t.id !== editingTaskId) return t;
+        return {
+          ...t,
+          title: editTitle.trim(),
+          date: editDate,
+        };
+      }),
+    };
+
+    const projects = getProjectsRepo();
+    const updatedProjects = projects.map((p) =>
+      p.id === updatedProject.id ? updatedProject : p
+    );
+
+    saveProjectsRepo(updatedProjects);
+    setProject(updatedProject);
+    closeTaskEditor();
+  }
+
+  function deleteTask(taskId: string) {
+    const confirmed = window.confirm("この作業を削除しますか？");
+    if (!confirmed) return;
+
+    const updatedProject: Project = {
+      ...currentProject,
+      tasks: currentProject.tasks.filter((t) => t.id !== taskId),
+    };
+
+    const projects = getProjectsRepo();
+    const updatedProjects = projects.map((p) =>
+      p.id === updatedProject.id ? updatedProject : p
+    );
+
+    saveProjectsRepo(updatedProjects);
+    setProject(updatedProject);
+
+    if (editingTaskId === taskId) {
+      closeTaskEditor();
+    }
   }
 
   function deleteProject() {
@@ -173,7 +247,7 @@ export default function ProjectDetailPage() {
 
     if (!confirmDelete) return;
 
-    const projects = getProjects();
+    const projects = getProjectsRepo();
 
     const filtered =
       projects.filter(
@@ -182,7 +256,7 @@ export default function ProjectDetailPage() {
           currentProject.id
       );
 
-    saveProjects(filtered);
+    saveProjectsRepo(filtered);
 
     router.push("/projects");
   }
@@ -203,11 +277,11 @@ export default function ProjectDetailPage() {
             href="/projects"
             className="
               rounded-full
-              bg-white/70
+              bg-white/70 dark:bg-zinc-900/75
               px-4
               py-2
               text-sm
-              text-zinc-500
+              text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
               backdrop-blur-xl
               shadow-[0_2px_10px_rgba(0,0,0,0.04)]
             "
@@ -221,11 +295,11 @@ export default function ProjectDetailPage() {
               href={`/projects/${currentProject.id}/edit`}
               className="
                 rounded-full
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75
                 px-4
                 py-2
                 text-sm
-                text-zinc-500
+                text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
                 backdrop-blur-xl
                 shadow-[0_2px_10px_rgba(0,0,0,0.04)]
               "
@@ -252,29 +326,9 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* メイン */}
-        <div
-          className="
-            relative
-            overflow-hidden
-            rounded-[38px]
-            border border-white/60
-            bg-white/75
-            p-6
-            backdrop-blur-2xl
-            shadow-[0_10px_40px_rgba(0,0,0,0.06)]
-          "
-        >
+        <div className={appSurfaces.heroCardLg}>
 
-          {/* 背景 */}
-          <div
-            className="
-              pointer-events-none
-              absolute
-              inset-0
-              bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.9),transparent_35%)]
-              opacity-80
-            "
-          />
+          <div className={appSurfaces.heroSheen} />
 
           <div className="relative z-10">
 
@@ -302,7 +356,7 @@ export default function ProjectDetailPage() {
                     {currentProject.client}
                   </h1>
 
-                  <p className="mt-2 text-sm text-zinc-400">
+                  <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
                     {currentProject.title}
                   </p>
 
@@ -323,7 +377,7 @@ export default function ProjectDetailPage() {
                   {progress}%
                 </p>
 
-                <p className="mt-1 text-xs text-zinc-400">
+                <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
 
                   {daysLeft !== null
                     ? `あと${daysLeft}日`
@@ -344,17 +398,17 @@ export default function ProjectDetailPage() {
                   items-center
                   gap-2
                   rounded-full
-                  bg-white/70
+                  bg-white/70 dark:bg-zinc-900/75
                   px-4
                   py-2
                   text-sm
-                  text-zinc-500
+                  text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
                   shadow-[0_2px_10px_rgba(0,0,0,0.03)]
                 "
               >
                 <span>納期</span>
 
-                <span className="text-zinc-800">
+                <span className="text-zinc-800 dark:text-zinc-100">
                   {formatDeadline(
                     currentProject.deadline
                   )}
@@ -372,7 +426,7 @@ export default function ProjectDetailPage() {
                   h-3
                   overflow-hidden
                   rounded-full
-                  bg-white
+                  bg-white dark:bg-zinc-900
                   shadow-inner
                 "
               >
@@ -407,7 +461,7 @@ export default function ProjectDetailPage() {
               作業
             </h2>
 
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-zinc-400 dark:text-zinc-500">
               {
                 currentProject.tasks.filter(
                   (task) =>
@@ -423,7 +477,7 @@ export default function ProjectDetailPage() {
           <div className="space-y-3">
 
             {currentProject.tasks.map(
-              (task) => {
+              (task, index) => {
 
                 const taskDaysLeft =
                   getTaskDaysLeft(
@@ -432,42 +486,41 @@ export default function ProjectDetailPage() {
 
                 return (
 
-                  <button
+                  <div
                     key={task.id}
-
-                    onClick={() =>
-                      toggleTask(
-                        task.id
-                      )
-                    }
-
+                    data-tour={index === 0 ? "project-task-toggle" : undefined}
                     className="
                       w-full
                       rounded-[24px]
-                      border border-white/60
-                      bg-white/70
+                      border border-white/60 dark:border-zinc-700/50
+                      bg-white/70 dark:bg-zinc-900/75
                       p-4
                       text-left
                       backdrop-blur-xl
                       transition-all
                     "
-
                     style={{
-                      borderColor:
-                        task.completed
-                          ? `${currentProject.color}50`
-                          : undefined,
-
-                      background:
-                        task.completed
-                          ? `${currentProject.color}12`
-                          : undefined,
+                      borderColor: task.completed
+                        ? `${currentProject.color}50`
+                        : undefined,
+                      background: task.completed
+                        ? `${currentProject.color}12`
+                        : undefined,
                     }}
                   >
 
                     <div className="flex items-start justify-between">
 
-                      <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          toggleTask(task.id);
+                          if (index === 0) {
+                            triggerTaskToggle();
+                          }
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
 
                         <p
                           className="
@@ -488,7 +541,7 @@ export default function ProjectDetailPage() {
 
                         <div className="mt-2 flex items-center gap-2">
 
-                          <p className="text-xs text-zinc-400">
+                          <p className="text-xs text-zinc-400 dark:text-zinc-500">
 
                             {task.date
                               ? task.date
@@ -505,7 +558,7 @@ export default function ProjectDetailPage() {
                                 px-2
                                 py-1
                                 text-[10px]
-                                text-zinc-500
+                                text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
                               "
                             >
 
@@ -519,45 +572,63 @@ export default function ProjectDetailPage() {
 
                         </div>
 
-                      </div>
+                      </button>
 
                       {/* チェック */}
-                      <div
-                        className="
-                          flex
-                          h-6
-                          w-6
-                          items-center
-                          justify-center
-                          rounded-full
-                          border
-                          text-xs
-                          transition-all
-                        "
+                      <div className="ml-4 flex items-start gap-2">
+                        <button
+                          type="button"
+                          data-tour={
+                            index === 0 ? "project-task-edit" : undefined
+                          }
+                          onClick={() => {
+                            openTaskEditor(task.id);
+                            if (index === 0) {
+                              triggerTaskEdit();
+                            }
+                          }}
+                          className="
+                            rounded-full
+                            bg-white/80 dark:bg-zinc-900/85
+                            px-3
+                            py-1.5
+                            text-xs
+                            text-zinc-600 dark:text-zinc-300
+                            border border-white/60 dark:border-zinc-700/50
+                          "
+                        >
+                          編集
+                        </button>
 
-                        style={{
-                          background:
-                            task.completed
+                        <div
+                          className="
+                            flex
+                            h-6
+                            w-6
+                            items-center
+                            justify-center
+                            rounded-full
+                            border
+                            text-xs
+                            transition-all
+                          "
+                          style={{
+                            background: task.completed
                               ? currentProject.color
                               : "transparent",
-
-                          borderColor:
-                            task.completed
+                            borderColor: task.completed
                               ? currentProject.color
                               : "#d4d4d8",
-
-                          color:
-                            task.completed
-                              ? "white"
-                              : "transparent",
-                        }}
-                      >
-                        ✓
+                            color: task.completed ? "white" : "transparent",
+                          }}
+                        >
+                          ✓
+                        </div>
                       </div>
 
                     </div>
 
-                  </button>
+                  </div>
 
                 );
               }
@@ -567,7 +638,114 @@ export default function ProjectDetailPage() {
 
         </div>
 
+        {/* タスク編集モーダル */}
+        {editingTaskId && (
+          <div className="fixed inset-0 z-50">
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={closeTaskEditor}
+            />
+            <div className="absolute bottom-0 left-0 right-0 mx-auto w-full max-w-md px-5 pb-6">
+              <div
+                className="
+                  rounded-[28px]
+                  border border-white/60 dark:border-zinc-700/50
+                  bg-white/95
+                  p-5
+                  shadow-[0_12px_40px_rgba(0,0,0,0.18)]
+                  backdrop-blur-xl
+                "
+              >
+                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                  作業を編集
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="例: ラフ提出"
+                    className="
+                      w-full
+                      rounded-2xl
+                      border border-zinc-200 dark:border-zinc-700
+                      bg-white dark:bg-zinc-900
+                      px-4
+                      py-3
+                      text-sm
+                      outline-none
+                    "
+                  />
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="
+                      w-full
+                      rounded-2xl
+                      border border-zinc-200 dark:border-zinc-700
+                      bg-white dark:bg-zinc-900
+                      px-4
+                      py-3
+                      text-sm
+                      outline-none
+                    "
+                  />
+                </div>
+
+                <div className="mt-5 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => deleteTask(editingTaskId)}
+                    className="
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-xs
+                      text-red-500
+                      bg-red-50
+                    "
+                  >
+                    削除
+                  </button>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={closeTaskEditor}
+                      className="
+                        rounded-xl
+                        px-3
+                        py-2
+                        text-xs
+                        text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
+                        bg-white dark:bg-zinc-900
+                        border border-zinc-200 dark:border-zinc-700
+                      "
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      data-tour="project-task-save"
+                      onClick={() => {
+                        saveTaskEdits();
+                        triggerTaskSave();
+                      }}
+                      className={`px-4 py-2 ${theme.btnSolid}`}
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
+      <BottomNav />
 
     </ThemedMain>
   );

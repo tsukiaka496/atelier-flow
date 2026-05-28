@@ -1,22 +1,23 @@
 "use client";
 
 import {
-  useEffect,
-  useState,
   type ReactNode,
 } from "react";
 
-import { getTheme } from "@/lib/storage";
+import {
+  resolvePageBackground,
+} from "@/lib/colorMode";
+import type { ThemeSettings } from "@/lib/storage";
 import { getAccentCssVars } from "@/lib/themeVars";
+import { useThemeSettings } from "@/lib/useThemeSettings";
 
 type ThemedMainProps = {
   children: ReactNode;
-  /** ページごとの余白など（min-h-screen / text-zinc-800 は共通） */
   className?: string;
-  /** 設定画面など、保存前のプレビュー用（省略時は localStorage のテーマ） */
   background?: string;
   backgroundImage?: string;
   accent?: string;
+  colorMode?: ThemeSettings["colorMode"];
 };
 
 export default function ThemedMain({
@@ -25,40 +26,38 @@ export default function ThemedMain({
   background: backgroundOverride,
   backgroundImage: backgroundImageOverride,
   accent: accentOverride,
+  colorMode: colorModeOverride,
 }: ThemedMainProps) {
-  const [theme, setTheme] = useState({
-    background: "#f7f7f5",
-    backgroundImage: "",
-    accent: "#38bdf8",
-  });
-
-  useEffect(() => {
-    const saved = getTheme();
-    setTheme({
-      background: saved.background,
-      backgroundImage: saved.backgroundImage,
-      accent: saved.accent,
-    });
-  }, []);
+  const theme = useThemeSettings();
 
   const background =
     backgroundOverride ?? theme.background;
 
   const backgroundImage =
-    backgroundImageOverride ?? theme.backgroundImage;
+    backgroundImageOverride ??
+    theme.backgroundImage;
 
   const accent =
     accentOverride ?? theme.accent;
 
+  const colorMode =
+    colorModeOverride ?? theme.colorMode;
+
+  const pageBackground = resolvePageBackground({
+    background,
+    backgroundImage,
+    colorMode,
+  });
+
   return (
     <main
-      className={`min-h-screen bg-cover bg-center text-zinc-800 ${className}`}
+      className={`min-h-screen bg-cover bg-center text-zinc-800 dark:text-zinc-100 ${className}`}
       style={{
         ...getAccentCssVars(accent),
-        background,
+        backgroundColor: pageBackground,
         backgroundImage: backgroundImage
           ? `url(${backgroundImage})`
-          : "none",
+          : undefined,
       }}
     >
       {children}

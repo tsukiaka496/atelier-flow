@@ -1,9 +1,9 @@
-import { getProjects } from "@/lib/storage";
+import { getProjects, type Task } from "@/lib/storage";
 
 export function getWeekTasks() {
   const projects = getProjects();
 
-  const tasks: any[] = [];
+  const tasks: Array<Task & { projectTitle: string }> = [];
 
   for (const p of projects) {
     for (const t of p.tasks) {

@@ -7,16 +7,14 @@ import {
 } from "next/navigation";
 
 import {
-  getProjects,
   normalizeProject,
   normalizeProjectColor,
-  saveProjects,
   Project,
   Task,
 } from "@/lib/storage";
+import { getProjectsRepo, saveProjectsRepo } from "@/lib/projectsRepo";
 
 import {
-  useEffect,
   useState,
 } from "react";
 
@@ -29,25 +27,18 @@ export default function EditProjectPage() {
   const router = useRouter();
 
   const [project, setProject] =
-    useState<Project | null>(null);
+    useState<Project | null>(() => {
+      const id = String(params.id);
+      const projects = getProjectsRepo();
+      const found = projects.find((p) => p.id === id);
+      return found ? normalizeProject(found) : null;
+    });
 
   const [newTask, setNewTask] =
     useState("");
 
   const [newTaskDate, setNewTaskDate] =
     useState("");
-
-  useEffect(() => {
-    const projects = getProjects();
-
-    const found = projects.find(
-      (p) => p.id === params.id
-    );
-
-    if (found) {
-      setProject(normalizeProject(found));
-    }
-  }, [params.id]);
 
   function updateField(
     key: keyof Project,
@@ -172,7 +163,7 @@ export default function EditProjectPage() {
     const normalized =
       normalizeProject(project);
 
-    const projects = getProjects();
+    const projects = getProjectsRepo();
 
     const updatedProjects =
       projects.map((p) =>
@@ -181,7 +172,7 @@ export default function EditProjectPage() {
           : p
       );
 
-    saveProjects(updatedProjects);
+    saveProjectsRepo(updatedProjects);
 
     router.push(
       `/projects/${project.id}`
@@ -191,7 +182,7 @@ export default function EditProjectPage() {
   if (!project) {
     return (
       <ThemedMain className="p-6">
-        <p className="text-zinc-400">
+        <p className="text-zinc-400 dark:text-zinc-500">
           読み込み中...
         </p>
       </ThemedMain>
@@ -214,13 +205,13 @@ export default function EditProjectPage() {
 
             rounded-full
 
-            bg-white/70
+            bg-white/70 dark:bg-zinc-900/75
 
             px-4
             py-2
 
             text-sm
-            text-zinc-500
+            text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
 
             backdrop-blur-xl
 
@@ -235,9 +226,9 @@ export default function EditProjectPage() {
           className="
             rounded-[38px]
 
-            border border-white/60
+            border border-white/60 dark:border-zinc-700/50
 
-            bg-white/75
+            bg-white/75 dark:bg-zinc-900/80
 
             p-6
 
@@ -254,7 +245,7 @@ export default function EditProjectPage() {
           {/* 依頼主 */}
           <div className="mb-6">
 
-            <p className="mb-2 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
               依頼主
             </p>
 
@@ -273,9 +264,9 @@ export default function EditProjectPage() {
 
                 rounded-2xl
 
-                border border-zinc-200
+                border border-zinc-200 dark:border-zinc-700
 
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75
 
                 px-4
                 py-4
@@ -289,7 +280,7 @@ export default function EditProjectPage() {
           {/* 依頼内容 */}
           <div className="mb-6">
 
-            <p className="mb-2 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
               依頼内容
             </p>
 
@@ -308,9 +299,9 @@ export default function EditProjectPage() {
 
                 rounded-2xl
 
-                border border-zinc-200
+                border border-zinc-200 dark:border-zinc-700
 
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75
 
                 px-4
                 py-4
@@ -324,7 +315,7 @@ export default function EditProjectPage() {
           {/* 納期 */}
           <div className="mb-6">
 
-            <p className="mb-2 text-sm text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
               納期
             </p>
 
@@ -345,9 +336,9 @@ export default function EditProjectPage() {
 
                 rounded-2xl
 
-                border border-zinc-200
+                border border-zinc-200 dark:border-zinc-700
 
-                bg-white/70
+                bg-white/70 dark:bg-zinc-900/75
 
                 px-4
                 py-4
@@ -361,7 +352,7 @@ export default function EditProjectPage() {
           {/* 色 */}
           <div className="mb-8">
 
-            <p className="mb-3 text-sm text-zinc-400">
+            <p className="mb-3 text-sm text-zinc-400 dark:text-zinc-500">
               イメージカラー
             </p>
 
@@ -403,7 +394,7 @@ export default function EditProjectPage() {
                 作業
               </p>
 
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
                 {project.tasks.length}件
               </p>
 
@@ -428,9 +419,9 @@ export default function EditProjectPage() {
 
                   rounded-2xl
 
-                  border border-zinc-200
+                  border border-zinc-200 dark:border-zinc-700
 
-                  bg-white/70
+                  bg-white/70 dark:bg-zinc-900/75
 
                   px-4
                   py-4
@@ -455,9 +446,9 @@ export default function EditProjectPage() {
 
                   rounded-2xl
 
-                  border border-zinc-200
+                  border border-zinc-200 dark:border-zinc-700
 
-                  bg-white/70
+                  bg-white/70 dark:bg-zinc-900/75
 
                   px-4
                   py-4
@@ -488,9 +479,9 @@ export default function EditProjectPage() {
                     className="
                       rounded-[24px]
 
-                      border border-zinc-200
+                      border border-zinc-200 dark:border-zinc-700
 
-                      bg-white/70
+                      bg-white/70 dark:bg-zinc-900/75
 
                       p-4
                     "
@@ -523,9 +514,9 @@ export default function EditProjectPage() {
 
                             rounded-xl
 
-                            border border-zinc-200
+                            border border-zinc-200 dark:border-zinc-700
 
-                            bg-white/70
+                            bg-white/70 dark:bg-zinc-900/75
 
                             px-3
                             py-2
