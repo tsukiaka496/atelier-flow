@@ -20,6 +20,8 @@ import {
 
 import ThemedMain from "@/components/ThemedMain";
 import { theme } from "@/lib/themeClasses";
+import DeadlineField from "@/components/DeadlineField";
+import TaskScheduleDateInput from "@/components/TaskScheduleDateInput";
 
 export default function EditProjectPage() {
   const params = useParams();
@@ -312,42 +314,12 @@ export default function EditProjectPage() {
 
           </div>
 
-          {/* 納期 */}
-          <div className="mb-6">
-
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
-              納期
-            </p>
-
-            <input
-              type="date"
-
-              value={project.deadline}
-
-              onChange={(e) =>
-                updateField(
-                  "deadline",
-                  e.target.value
-                )
-              }
-
-              className="
-                w-full
-
-                rounded-2xl
-
-                border border-zinc-200 dark:border-zinc-700
-
-                bg-white/70 dark:bg-zinc-900/75
-
-                px-4
-                py-4
-
-                outline-none
-              "
-            />
-
-          </div>
+          <DeadlineField
+            value={project.deadline}
+            onChange={(value) =>
+              updateField("deadline", value)
+            }
+          />
 
           {/* 色 */}
           <div className="mb-8">
@@ -430,31 +402,9 @@ export default function EditProjectPage() {
                 "
               />
 
-              <input
-                type="date"
-
+              <TaskScheduleDateInput
                 value={newTaskDate}
-
-                onChange={(e) =>
-                  setNewTaskDate(
-                    e.target.value
-                  )
-                }
-
-                className="
-                  w-full
-
-                  rounded-2xl
-
-                  border border-zinc-200 dark:border-zinc-700
-
-                  bg-white/70 dark:bg-zinc-900/75
-
-                  px-4
-                  py-4
-
-                  outline-none
-                "
+                onChange={setNewTaskDate}
               />
 
               <button
@@ -495,36 +445,14 @@ export default function EditProjectPage() {
                           {task.title}
                         </p>
 
-                        <input
-                          type="date"
-
+                        <TaskScheduleDateInput
                           value={task.date}
-
-                          onChange={(e) =>
+                          onChange={(date) =>
                             updateTaskDate(
                               task.id,
-                              e.target.value
+                              date
                             )
                           }
-
-                          className="
-                            mt-3
-
-                            w-full
-
-                            rounded-xl
-
-                            border border-zinc-200 dark:border-zinc-700
-
-                            bg-white/70 dark:bg-zinc-900/75
-
-                            px-3
-                            py-2
-
-                            text-sm
-
-                            outline-none
-                          "
                         />
 
                       </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import BottomNav from "@/components/BottomNav";
 import ThemedMain from "@/components/ThemedMain";
+import DeadlineField from "@/components/DeadlineField";
 import { theme } from "@/lib/themeClasses";
 
 import {
@@ -115,30 +116,10 @@ export default function CreatePage() {
             />
           </div>
 
-          {/* 納期 */}
-          <div>
-            <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
-              納期
-            </p>
-
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) =>
-                setDeadline(e.target.value)
-              }
-              className="
-                w-full
-                rounded-[24px]
-                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-                bg-white dark:bg-zinc-900 dark:bg-zinc-900
-                px-5
-                py-4
-                text-sm
-                outline-none
-              "
-            />
-          </div>
+          <DeadlineField
+            value={deadline}
+            onChange={setDeadline}
+          />
 
           {/* 工程 */}
           <div>

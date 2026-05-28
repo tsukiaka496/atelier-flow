@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import Link from "next/link";
 
 import {
   saveProjectsRepo,
@@ -146,6 +147,18 @@ export default function Home() {
     );
   }
 
+  function getDeadlinesForDate(
+    date: Date
+  ) {
+    const target =
+      formatDate(date);
+
+    return projects.filter(
+      (project) =>
+        project.deadline === target
+    );
+  }
+
   function getShiftForDate(
     date: Date
   ) {
@@ -164,6 +177,110 @@ export default function Home() {
       (template) =>
         template.id ===
         shift.templateId
+    );
+  }
+
+  const activeDeadlines =
+    projects.filter(
+      (project) =>
+        project.deadline ===
+        activeDate
+    );
+
+  function DayScheduleItems({
+    date,
+  }: {
+    date: Date;
+  }) {
+    const dayTasks =
+      getTasksForDate(date);
+    const dayDeadlines =
+      getDeadlinesForDate(date);
+    const shift =
+      getShiftForDate(date);
+    const taskLimit =
+      dayDeadlines.length > 0
+        ? 1
+        : 2;
+
+    return (
+      <>
+        {shift && (
+          <div className={`mb-2 rounded-xl px-2 py-1 ${theme.bgSoft} ${theme.text10}`}>
+            仕事
+          </div>
+        )}
+
+        {dayDeadlines
+          .slice(0, 1)
+          .map((project) => (
+            <div
+              key={project.id}
+              className="
+                mb-2
+                rounded-xl
+                border
+                border-amber-200/80
+                bg-amber-50/90
+                px-2
+                py-1
+                text-[10px]
+                text-amber-800
+                dark:border-amber-900/50
+                dark:bg-amber-950/50
+                dark:text-amber-200
+              "
+            >
+              締切 ·{" "}
+              {project.client ||
+                project.title}
+            </div>
+          ))}
+
+        <div className="space-y-1 overflow-hidden">
+          {dayTasks.length ===
+            0 &&
+            !shift &&
+            dayDeadlines.length ===
+              0 && (
+              <p className="text-[10px] text-zinc-300 dark:text-zinc-500">
+                予定なし
+              </p>
+            )}
+
+          {dayTasks
+            .slice(0, taskLimit)
+            .map((task) => (
+              <div
+                key={task.id}
+                className={`
+                  flex
+                  items-center
+                  gap-1
+                  text-[11px]
+
+                  ${
+                    task.completed
+                      ? "opacity-40"
+                      : ""
+                  }
+                `}
+              >
+                <div
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    background:
+                      task.color,
+                  }}
+                />
+
+                <p className="truncate">
+                  {task.title}
+                </p>
+              </div>
+            ))}
+        </div>
+      </>
     );
   }
 
@@ -337,10 +454,53 @@ export default function Home() {
 
             )}
 
+            {activeDeadlines.length >
+              0 && (
+              <div className="mb-4 space-y-2">
+                {activeDeadlines.map(
+                  (project) => (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      className="
+                        block
+                        rounded-2xl
+                        border
+                        border-amber-200/80
+                        bg-amber-50/90
+                        px-4
+                        py-3
+                        transition-all
+                        dark:border-amber-900/50
+                        dark:bg-amber-950/40
+                      "
+                    >
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                        締切
+                      </p>
+
+                      <p className={`mt-1 text-sm font-medium ${appSurfaces.bodyText}`}>
+                        {project.client ||
+                          "依頼主なし"}
+                      </p>
+
+                      <p className={`mt-0.5 text-xs ${appSurfaces.subtleText}`}>
+                        {project.title ||
+                          "依頼内容なし"}
+                      </p>
+                    </Link>
+                  )
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
 
               {activeTasks.length ===
-                0 && !activeTemplate && (
+                0 &&
+                !activeTemplate &&
+                activeDeadlines.length ===
+                  0 && (
 
                 <div className={appSurfaces.emptyPanel}>
                   予定はありません
@@ -521,13 +681,6 @@ export default function Home() {
         <div className="mb-3 grid grid-cols-4 gap-3">
 
           {topDays.map((date) => {
-
-            const dayTasks =
-              getTasksForDate(date);
-
-            const shift =
-              getShiftForDate(date);
-
             const targetDate =
               formatDate(date);
 
@@ -611,60 +764,9 @@ export default function Home() {
 
                 </div>
 
-                {shift && (
-                  <div className={`mb-2 rounded-xl px-2 py-1 ${theme.bgSoft} ${theme.text10}`}>
-                    仕事
-                  </div>
-                )}
-
-                <div className="space-y-1 overflow-hidden">
-
-                  {dayTasks.length ===
-                    0 && !shift && (
-
-                    <p className="text-[10px] text-zinc-300 dark:text-zinc-500">
-                      予定なし
-                    </p>
-
-                  )}
-
-                  {dayTasks
-                    .slice(0, 2)
-                    .map((task) => (
-
-                      <div
-                        key={task.id}
-                        className={`
-                          flex
-                          items-center
-                          gap-1
-                          text-[11px]
-
-                          ${
-                            task.completed
-                              ? "opacity-40"
-                              : ""
-                          }
-                        `}
-                      >
-
-                        <div
-                          className="h-2.5 w-2.5 rounded-full shrink-0"
-                          style={{
-                            background:
-                              task.color,
-                          }}
-                        />
-
-                        <p className="truncate">
-                          {task.title}
-                        </p>
-
-                      </div>
-
-                    ))}
-
-                </div>
+                <DayScheduleItems
+                  date={date}
+                />
 
               </button>
 
@@ -677,13 +779,6 @@ export default function Home() {
         <div className="flex justify-center gap-3">
 
           {bottomDays.map((date) => {
-
-            const dayTasks =
-              getTasksForDate(date);
-
-            const shift =
-              getShiftForDate(date);
-
             const targetDate =
               formatDate(date);
 
@@ -768,60 +863,9 @@ export default function Home() {
 
                 </div>
 
-                {shift && (
-                  <div className={`mb-2 rounded-xl px-2 py-1 ${theme.bgSoft} ${theme.text10}`}>
-                    仕事
-                  </div>
-                )}
-
-                <div className="space-y-1 overflow-hidden">
-
-                  {dayTasks.length ===
-                    0 && !shift && (
-
-                    <p className="text-[10px] text-zinc-300 dark:text-zinc-500">
-                      予定なし
-                    </p>
-
-                  )}
-
-                  {dayTasks
-                    .slice(0, 2)
-                    .map((task) => (
-
-                      <div
-                        key={task.id}
-                        className={`
-                          flex
-                          items-center
-                          gap-1
-                          text-[11px]
-
-                          ${
-                            task.completed
-                              ? "opacity-40"
-                              : ""
-                          }
-                        `}
-                      >
-
-                        <div
-                          className="h-2.5 w-2.5 rounded-full shrink-0"
-                          style={{
-                            background:
-                              task.color,
-                          }}
-                        />
-
-                        <p className="truncate">
-                          {task.title}
-                        </p>
-
-                      </div>
-
-                    ))}
-
-                </div>
+                <DayScheduleItems
+                  date={date}
+                />
 
               </button>
 

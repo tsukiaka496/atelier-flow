@@ -20,6 +20,8 @@ import {
 
 import ThemedMain from "@/components/ThemedMain";
 import { theme } from "@/lib/themeClasses";
+import DeadlineField from "@/components/DeadlineField";
+import TaskScheduleDateInput from "@/components/TaskScheduleDateInput";
 import { scrollTourTargetIntoView } from "@/lib/tutorialPositioning";
 import {
   registerTutorialAction,
@@ -348,41 +350,10 @@ export default function NewProjectPage() {
 
           </div>
 
-          {/* 納期 */}
-          <div className="mb-6">
-
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
-              納期
-            </p>
-
-            <input
-              type="date"
-
-              value={deadline}
-
-              onChange={(e) =>
-                setDeadline(
-                  e.target.value
-                )
-              }
-
-              className="
-                w-full
-
-                rounded-2xl
-
-                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-
-                bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
-
-                px-4
-                py-4
-
-                outline-none
-              "
-            />
-
-          </div>
+          <DeadlineField
+            value={deadline}
+            onChange={setDeadline}
+          />
 
           {/* 色 */}
           <div className="mb-8">
@@ -464,31 +435,9 @@ export default function NewProjectPage() {
                 "
               />
 
-              <input
-                type="date"
-
+              <TaskScheduleDateInput
                 value={taskDate}
-
-                onChange={(e) =>
-                  setTaskDate(
-                    e.target.value
-                  )
-                }
-
-                className="
-                  w-full
-
-                  rounded-2xl
-
-                  border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-
-                  bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
-
-                  px-4
-                  py-4
-
-                  outline-none
-                "
+                onChange={setTaskDate}
               />
 
               <button
@@ -529,10 +478,11 @@ export default function NewProjectPage() {
                           {task.title}
                         </p>
 
-                        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
+                        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
 
-                          {task.date ||
-                            "日付なし"}
+                          {task.date
+                            ? `やる日: ${task.date}`
+                            : "やる日: 未設定"}
 
                         </p>
 
