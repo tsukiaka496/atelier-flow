@@ -502,23 +502,27 @@ export function recoverStepForPathname(
     (step) => step.id === currentStepId
   );
 
-  let best: GuidedStep | null = null;
-  let bestIndex = Number.POSITIVE_INFINITY;
+  if (currentIndex < 0) {
+    return matching[0].id;
+  }
+
+  let bestForward: GuidedStep | null = null;
+  let bestForwardIndex = Number.POSITIVE_INFINITY;
 
   for (const step of matching) {
     const index = GUIDED_STEPS.findIndex(
       (item) => item.id === step.id
     );
 
-    if (index < currentIndex - 1) {
-      continue;
-    }
-
-    if (index < bestIndex) {
-      best = step;
-      bestIndex = index;
+    if (index >= currentIndex && index < bestForwardIndex) {
+      bestForward = step;
+      bestForwardIndex = index;
     }
   }
 
-  return best?.id ?? matching[0].id;
+  if (bestForward) {
+    return bestForward.id;
+  }
+
+  return currentStepId;
 }

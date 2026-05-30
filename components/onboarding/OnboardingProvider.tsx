@@ -441,10 +441,29 @@ export default function OnboardingProvider({
       snapshot.currentStepId ?? "none"
     );
 
-    const recovered = recoverStepForPathname(
+    let recovered = recoverStepForPathname(
       pathname,
       snapshot.currentStepId
     );
+
+    if (
+      recovered &&
+      recovered !== snapshot.currentStepId
+    ) {
+      const recoveredStep =
+        GUIDED_STEPS.find(
+          (item) => item.id === recovered
+        ) ?? null;
+
+      if (
+        recoveredStep?.enterWhenReadyKey &&
+        !isTutorialReady(
+          recoveredStep.enterWhenReadyKey
+        )
+      ) {
+        recovered = snapshot.currentStepId;
+      }
+    }
 
     requestAnimationFrame(() => {
       if (recovered) {
@@ -493,10 +512,26 @@ export default function OnboardingProvider({
       step &&
       !matchesGuidedStepRoute(step, pathname)
     ) {
-      const recovered = recoverStepForPathname(
+      let recovered = recoverStepForPathname(
         pathname,
         currentStepId
       );
+
+      if (recovered && recovered !== currentStepId) {
+        const recoveredStep =
+          GUIDED_STEPS.find(
+            (item) => item.id === recovered
+          ) ?? null;
+
+        if (
+          recoveredStep?.enterWhenReadyKey &&
+          !isTutorialReady(
+            recoveredStep.enterWhenReadyKey
+          )
+        ) {
+          recovered = currentStepId;
+        }
+      }
 
       if (recovered && recovered !== currentStepId) {
         logTutorialTimeline(
@@ -508,9 +543,35 @@ export default function OnboardingProvider({
           setCurrentStepId(recovered);
           setPendingStepId(null);
         });
+        return;
+      }
+
+      const navTarget =
+        getGuidedNavigateTargetForStep(
+          step,
+          pathname
+        ) ??
+        resolveTutorialNavigation(
+          step,
+          pathname
+        );
+
+      if (navTarget) {
+        logTutorialTimeline(
+          "route redirect",
+          navTarget
+        );
+        setIsTransitioning(true);
+        setPendingStepId(currentStepId);
+        router.push(navTarget);
       }
     }
-  }, [currentStepId, pathname, pendingStepId]);
+  }, [
+    currentStepId,
+    pathname,
+    pendingStepId,
+    router,
+  ]);
 
   useEffect(() => {
     persistSession();
