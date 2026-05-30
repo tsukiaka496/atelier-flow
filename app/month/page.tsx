@@ -11,7 +11,18 @@ import {
   saveShifts,
   Shift,
   ShiftTemplate,
+  ShiftTemplateKind,
 } from "@/lib/storage";
+import {
+  formatShiftTimeRange,
+  getShiftKindLabel,
+  getShiftTemplateKind,
+} from "@/lib/shiftDisplay";
+import {
+  getTemplatesForDate,
+  shiftMatchesKind,
+} from "@/lib/shiftUtils";
+import MonthDayShiftBadges from "@/components/MonthDayShiftBadges";
 
 import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
@@ -130,6 +141,12 @@ export default function MonthPage() {
   const [end, setEnd] =
     useState("");
 
+  const [templateKind, setTemplateKind] =
+    useState<ShiftTemplateKind>("work");
+
+  const [noTime, setNoTime] =
+    useState(false);
+
   const [editMode, setEditMode] =
     useState(false);
 
@@ -181,9 +198,11 @@ export default function MonthPage() {
     return registerTutorialHook(
       "month-template-prepare",
       () => {
+        setTemplateKind("work");
         setName("仕事");
-        setStart("10:00");
-        setEnd("18:00");
+        setNoTime(true);
+        setStart("");
+        setEnd("");
       }
     );
   }, []);
@@ -220,15 +239,22 @@ export default function MonthPage() {
   }
 
   function addTemplateFromForm() {
-    if (!name || !start || !end) {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    if (!noTime && (!start || !end)) {
       return;
     }
 
     const newTemplate: ShiftTemplate = {
       id: crypto.randomUUID(),
-      name,
-      start,
-      end,
+      name: trimmedName,
+      start: noTime ? "" : start,
+      end: noTime ? "" : end,
+      kind: templateKind,
     };
 
     const updatedTemplates = [
@@ -241,6 +267,7 @@ export default function MonthPage() {
     setName("");
     setStart("");
     setEnd("");
+    setNoTime(false);
     requestAnimationFrame(() => {
       bumpTutorialReady();
     });
@@ -249,7 +276,12 @@ export default function MonthPage() {
   const handleAddTemplate = useTourAction(
     "month-template-add",
     () => {
-      if (name && start && end) {
+      const trimmedName = name.trim();
+
+      if (
+        trimmedName &&
+        (noTime || (start && end))
+      ) {
         addTemplateFromForm();
         return;
       }
@@ -325,21 +357,55 @@ export default function MonthPage() {
       return;
     }
 
+    const activeTemplate =
+      templates.find(
+        (template) =>
+          template.id ===
+          activeTemplateId
+      );
+
+    if (!activeTemplate) {
+      return;
+    }
+
+    const kind =
+      getShiftTemplateKind(
+        activeTemplate
+      );
+
     const existingShift =
       shifts.find(
         (shift) =>
-          shift.date === date
+          shift.date === date &&
+          shiftMatchesKind(
+            shift,
+            kind,
+            templates
+          )
       );
 
     let updatedShifts: Shift[] =
       [];
 
-    if (existingShift) {
-      updatedShifts =
-        shifts.filter(
-          (shift) =>
-            shift.date !== date
-        );
+    if (
+      existingShift?.templateId ===
+      activeTemplateId
+    ) {
+      updatedShifts = shifts.filter(
+        (shift) => shift !== existingShift
+      );
+    } else if (existingShift) {
+      updatedShifts = shifts.map(
+        (shift) =>
+          shift === existingShift
+            ? {
+                date,
+                templateId:
+                  activeTemplateId,
+                kind,
+              }
+            : shift
+      );
     } else {
       updatedShifts = [
         ...shifts,
@@ -347,20 +413,12 @@ export default function MonthPage() {
           date,
           templateId:
             activeTemplateId,
+          kind,
         },
       ];
     }
 
     saveShifts(updatedShifts);
-  }
-
-  function getShift(
-    date: string
-  ) {
-    return shifts.find(
-      (shift) =>
-        shift.date === date
-    );
   }
 
   function getTemplate(
@@ -497,17 +555,19 @@ export default function MonthPage() {
               const dateString =
                 formatDate(date);
 
-              const shift =
-                getShift(
-                  dateString
+              const dayShifts =
+                getTemplatesForDate(
+                  dateString,
+                  shifts,
+                  templates
                 );
 
-              const template =
-                shift
-                  ? getTemplate(
-                      shift.templateId
-                    )
-                  : null;
+              const hasWork =
+                Boolean(dayShifts.work);
+              const hasSchedule =
+                Boolean(dayShifts.schedule);
+              const hasAnyShift =
+                hasWork || hasSchedule;
 
               const isToday =
                 dateString ===
@@ -530,22 +590,26 @@ export default function MonthPage() {
                     aspect-square
                     rounded-[22px]
                     border
-                    p-2
+                    p-1.5
                     text-left
                     transition-all
 
                     ${
-                      shift
+                      hasWork && hasSchedule
                         ? `
-                          ${theme.border}
-                          ${theme.bgSoft}
+                          border-[var(--theme-accent-border)]
+                          bg-[linear-gradient(135deg,color-mix(in_srgb,var(--theme-accent)_12%,transparent)_0%,color-mix(in_srgb,#8b5cf6_12%,transparent)_100%)]
                         `
+                        : hasSchedule
+                        ? appSurfaces.monthDayShiftSchedule
+                        : hasWork
+                        ? appSurfaces.monthDayShiftWork
                         : appSurfaces.monthDayIdle
                     }
 
                     ${
                       isToday
-                        ? theme.ring
+                        ? appSurfaces.monthDayToday
                         : ""
                     }
 
@@ -575,23 +639,11 @@ export default function MonthPage() {
                     {date.getDate()}
                   </p>
 
-                  {template && (
-
-                    <div className="mt-2">
-
-                      <p className="text-[10px] text-zinc-700 dark:text-zinc-300">
-                        仕事
-                      </p>
-
-                      <p className="mt-1 text-[9px] text-zinc-400">
-                        {template.start}
-                        〜
-                        {template.end}
-                      </p>
-
-                    </div>
-
-                  )}
+                  <MonthDayShiftBadges
+                    work={dayShifts.work}
+                    schedule={dayShifts.schedule}
+                    compact
+                  />
 
                 </button>
 
@@ -607,29 +659,91 @@ export default function MonthPage() {
           className={`mb-5 p-4 ${appSurfaces.cardSm}`}
         >
 
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-2">
 
             <p className="text-sm text-zinc-400">
-              シフトテンプレ
+              追加
             </p>
 
-            <button
-              type="button"
-              {...tourInstanceProps(
-                "month-template-add",
-                templateAddInstance
-              )}
-              onClick={handleAddTemplate}
-              className={`
-                rounded-full
-                ${theme.bgSoft}
-                px-3
-                py-1.5
-                ${theme.textXs}
-              `}
-            >
-              追加
-            </button>
+            <div className="flex items-center gap-2">
+              <div
+                data-tour="month-kind-toggle"
+                className="
+                  flex
+                  rounded-full
+                  border border-zinc-200
+                  p-0.5
+                  text-[10px]
+                  dark:border-zinc-700
+                "
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTemplateKind("work")
+                  }
+                  className={`
+                    rounded-full
+                    px-2.5
+                    py-1
+                    transition-all
+
+                    ${
+                      templateKind === "work"
+                        ? `${theme.bgSoft} ${theme.text10Medium}`
+                        : "text-zinc-400"
+                    }
+                  `}
+                >
+                  仕事
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTemplateKind("schedule")
+                  }
+                  className={`
+                    rounded-full
+                    px-2.5
+                    py-1
+                    transition-all
+
+                    ${
+                      templateKind === "schedule"
+                        ? `
+                          bg-violet-100
+                          font-medium
+                          text-violet-700
+                          dark:bg-violet-950/60
+                          dark:text-violet-300
+                        `
+                        : "text-zinc-400"
+                    }
+                  `}
+                >
+                  予定
+                </button>
+              </div>
+
+              <button
+                type="button"
+                {...tourInstanceProps(
+                  "month-template-add",
+                  templateAddInstance
+                )}
+                onClick={handleAddTemplate}
+                className={`
+                  rounded-full
+                  ${theme.bgSoft}
+                  px-3
+                  py-1.5
+                  ${theme.textXs}
+                `}
+              >
+                追加
+              </button>
+            </div>
 
           </div>
 
@@ -642,35 +756,55 @@ export default function MonthPage() {
                   e.target.value
                 )
               }
-              placeholder="例: 夕勤"
+              placeholder={
+                templateKind === "schedule"
+                  ? "例: 打ち合わせ"
+                  : "例: 夕勤"
+              }
               className={appSurfaces.input}
             />
 
-            <div className="flex gap-3">
-
+            <label className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
               <input
-                type="time"
-                value={start}
-                onChange={(e) =>
-                  setStart(
-                    e.target.value
+                type="checkbox"
+                checked={noTime}
+                onChange={(event) =>
+                  setNoTime(
+                    event.target.checked
                   )
                 }
-                className={`flex-1 px-4 py-3 text-sm ${appSurfaces.input}`}
+                className="rounded border-zinc-300"
               />
+              時間なし
+            </label>
 
-              <input
-                type="time"
-                value={end}
-                onChange={(e) =>
-                  setEnd(
-                    e.target.value
-                  )
-                }
-                className={`flex-1 px-4 py-3 text-sm ${appSurfaces.input}`}
-              />
+            {!noTime && (
+              <div className="flex gap-3">
 
-            </div>
+                <input
+                  type="time"
+                  value={start}
+                  onChange={(e) =>
+                    setStart(
+                      e.target.value
+                    )
+                  }
+                  className={`flex-1 px-4 py-3 text-sm ${appSurfaces.input}`}
+                />
+
+                <input
+                  type="time"
+                  value={end}
+                  onChange={(e) =>
+                    setEnd(
+                      e.target.value
+                    )
+                  }
+                  className={`flex-1 px-4 py-3 text-sm ${appSurfaces.input}`}
+                />
+
+              </div>
+            )}
 
           </div>
 
@@ -680,8 +814,15 @@ export default function MonthPage() {
         <div className="mb-6 flex gap-3 overflow-x-auto pb-2">
 
           {templates.map(
-            (template) => (
+            (template) => {
+              const kind =
+                getShiftTemplateKind(
+                  template
+                );
+              const isSchedule =
+                kind === "schedule";
 
+              return (
               <div
                 key={template.id}
                 className={`
@@ -695,10 +836,9 @@ export default function MonthPage() {
                   ${
                     activeTemplateId ===
                     template.id
-                      ? `
-                        ${theme.border}
-                        ${theme.bgSoft}
-                      `
+                      ? isSchedule
+                        ? appSurfaces.monthDayShiftSchedule
+                        : appSurfaces.monthDayShiftWork
                       : appSurfaces.panelIdle
                   }
                 `}
@@ -713,14 +853,37 @@ export default function MonthPage() {
                   className="text-left"
                 >
 
-                  <p className="text-sm font-medium">
-                    {template.name}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium">
+                      {template.name}
+                    </p>
+
+                    <span
+                      className={`
+                        rounded-full
+                        px-1.5
+                        py-0.5
+                        text-[9px]
+                        font-medium
+
+                        ${
+                          isSchedule
+                            ? `
+                              bg-violet-100
+                              text-violet-700
+                              dark:bg-violet-950/60
+                              dark:text-violet-300
+                            `
+                            : `${theme.bgSoft} ${theme.text10}`
+                        }
+                      `}
+                    >
+                      {getShiftKindLabel(template)}
+                    </span>
+                  </div>
 
                   <p className="mt-1 text-xs text-zinc-400">
-                    {template.start}
-                    〜
-                    {template.end}
+                    {formatShiftTimeRange(template)}
                   </p>
 
                 </button>
@@ -745,8 +908,8 @@ export default function MonthPage() {
                 </button>
 
               </div>
-
-            )
+            );
+            }
           )}
 
         </div>

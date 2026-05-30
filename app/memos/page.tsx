@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useRef,
   useSyncExternalStore,
   useState,
 } from "react";
@@ -117,6 +118,13 @@ export default function MemosPage() {
   const [editImportance, setEditImportance] =
     useState(MEMO_IMPORTANCE_NORMAL);
 
+  const [exitingMemoIds, setExitingMemoIds] =
+    useState<string[]>([]);
+
+  const exitTimersRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
+
   const sortType = useSyncExternalStore(
     subscribeListPrefs,
     getSortTypeSnapshot,
@@ -143,6 +151,69 @@ export default function MemosPage() {
   }
 
   function toggleMemoComplete(memoId: string) {
+    const target =
+      memos.find((memo) => memo.id === memoId) ??
+      null;
+
+    if (!target) {
+      return;
+    }
+
+    if (target.isCompleted) {
+      const updated = memos.map((memo) => {
+        if (memo.id !== memoId) {
+          return memo;
+        }
+
+        return {
+          ...memo,
+          isCompleted: false,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+      saveMemosRepo(updated);
+      return;
+    }
+
+    if (!showCompleted) {
+      setExitingMemoIds((current) => [
+        ...current,
+        memoId,
+      ]);
+
+      if (exitTimersRef.current[memoId]) {
+        clearTimeout(
+          exitTimersRef.current[memoId]
+        );
+      }
+
+      exitTimersRef.current[memoId] =
+        setTimeout(() => {
+          const updated = memos.map((memo) => {
+            if (memo.id !== memoId) {
+              return memo;
+            }
+
+            return {
+              ...memo,
+              isCompleted: true,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          saveMemosRepo(updated);
+
+          setExitingMemoIds((current) =>
+            current.filter((id) => id !== memoId)
+          );
+
+          delete exitTimersRef.current[memoId];
+        }, 480);
+
+      return;
+    }
+
     const updated = memos.map((memo) => {
       if (memo.id !== memoId) {
         return memo;
@@ -150,7 +221,7 @@ export default function MemosPage() {
 
       return {
         ...memo,
-        isCompleted: !memo.isCompleted,
+        isCompleted: true,
         updatedAt: new Date().toISOString(),
       };
     });
@@ -242,7 +313,11 @@ export default function MemosPage() {
   }
 
   const filtered = memos.filter((memo) => {
-    if (!showCompleted && memo.isCompleted) {
+    if (
+      !showCompleted &&
+      memo.isCompleted &&
+      !exitingMemoIds.includes(memo.id)
+    ) {
       return false;
     }
 
@@ -360,10 +435,24 @@ export default function MemosPage() {
             </div>
           )}
 
-          {sorted.map((memo) => (
+          {sorted.map((memo) => {
+            const isExiting =
+              exitingMemoIds.includes(memo.id);
+
+            return (
             <div
               key={memo.id}
-              className={`p-5 ${appSurfaces.card}`}
+              className={`
+                p-5
+                ${appSurfaces.card}
+                overflow-hidden
+
+                ${
+                  isExiting
+                    ? "memo-complete-exit"
+                    : ""
+                }
+              `}
             >
               <div className="flex items-start gap-3">
                 <button
@@ -475,7 +564,8 @@ export default function MemosPage() {
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
 

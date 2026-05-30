@@ -11,6 +11,10 @@ import {
   useTourInstanceId,
 } from "@/lib/useTourInstanceId";
 import { appSurfaces } from "@/lib/appSurfaces";
+import {
+  getProjectProgress,
+  isProjectFullyCompleted,
+} from "@/lib/projectProgress";
 
 import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
@@ -121,23 +125,11 @@ export default function ProjectsPage() {
   }
 
   function getProgress(project: Project) {
-    if (project.tasks.length === 0) {
-      return 0;
-    }
-
-    const completed =
-      project.tasks.filter(
-        (task) => task.completed
-      ).length;
-
-    return Math.round(
-      (completed / project.tasks.length) *
-        100
-    );
+    return getProjectProgress(project);
   }
 
   function isCompleted(project: Project) {
-    return getProgress(project) === 100;
+    return isProjectFullyCompleted(project);
   }
 
   const filteredProjects = projects.filter(
@@ -288,6 +280,8 @@ export default function ProjectsPage() {
               );
             const progress =
               getProgress(project);
+            const projectDone =
+              isCompleted(project);
             const isTourCard =
               project.id === tourProjectId;
             const cardTourProps =
@@ -301,7 +295,28 @@ export default function ProjectsPage() {
             const card = (
                 <Link
                   href={`/projects/${project.id}`}
-                  className={`block p-5 ${appSurfaces.card}`}
+                  className={`
+                    block p-5
+                    ${appSurfaces.card}
+                    transition-all
+
+                    ${
+                      projectDone
+                        ? `
+                          opacity-70
+                          saturate-[0.65]
+                        `
+                        : ""
+                    }
+                  `}
+                  style={
+                    projectDone
+                      ? {
+                          borderColor:
+                            "color-mix(in srgb, var(--theme-accent) 25%, transparent)",
+                        }
+                      : undefined
+                  }
                   {...cardTourProps}
                   onClick={
                     isTourCard
@@ -325,10 +340,38 @@ export default function ProjectsPage() {
                       />
 
                       <div>
-                        <h2 className="text-[15px] font-medium">
-                          {project.client ||
-                            "依頼主なし"}
-                        </h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2
+                            className={`text-[15px] font-medium ${
+                              projectDone
+                                ? "text-zinc-400 line-through dark:text-zinc-500"
+                                : ""
+                            }`}
+                          >
+                            {project.client ||
+                              "依頼主なし"}
+                          </h2>
+
+                          {projectDone && (
+                            <span
+                              className="
+                                rounded-full
+                                px-2
+                                py-0.5
+                                text-[10px]
+                                font-medium
+                              "
+                              style={{
+                                background:
+                                  "color-mix(in srgb, var(--theme-accent) 18%, transparent)",
+                                color:
+                                  "var(--theme-accent)",
+                              }}
+                            >
+                              完了
+                            </span>
+                          )}
+                        </div>
 
                         <p className={`mt-1 text-sm ${appSurfaces.subtleText}`}>
                           {project.title ||

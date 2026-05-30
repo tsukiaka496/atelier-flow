@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useCallback,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -22,7 +24,15 @@ import { appSurfaces } from "@/lib/appSurfaces";
 
 import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
+import SimpleDatePicker from "@/components/SimpleDatePicker";
 import HintLabel from "@/components/onboarding/HintLabel";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
+import { registerTutorialAction } from "@/lib/tutorialActionRegistry";
+import {
+  formatShiftTimeRange,
+  getShiftKindLabel,
+} from "@/lib/shiftDisplay";
+import { getTemplatesForDate } from "@/lib/shiftUtils";
 
 function getWeekDates(offset = 0) {
   const now = new Date();
@@ -70,7 +80,45 @@ function formatDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function getMondayStart(date: Date) {
+  const monday = new Date(date);
+  const currentDay = monday.getDay();
+  const mondayOffset =
+    currentDay === 0 ? -6 : 1 - currentDay;
+
+  monday.setDate(
+    monday.getDate() + mondayOffset
+  );
+  monday.setHours(0, 0, 0, 0);
+
+  return monday;
+}
+
+function getWeekOffsetForDate(
+  targetDateString: string
+) {
+  const targetMonday = getMondayStart(
+    new Date(targetDateString)
+  );
+  const todayMonday = getMondayStart(
+    new Date()
+  );
+  const diffMs =
+    targetMonday.getTime() -
+    todayMonday.getTime();
+
+  return Math.round(
+    diffMs / (7 * 24 * 60 * 60 * 1000)
+  );
+}
+
 export default function Home() {
+  const {
+    currentStepId,
+    isTutorialActive,
+    runTourAction,
+  } = useOnboarding();
+
   const [weekOffset, setWeekOffset] =
     useState(0);
 
@@ -81,6 +129,45 @@ export default function Home() {
 
   const [selectedDay, setSelectedDay] =
     useState<string | null>(null);
+
+  const [calendarOpen, setCalendarOpen] =
+    useState(false);
+
+  const handleDatePickerClick =
+    useCallback(() => {
+      setCalendarOpen((open) => !open);
+
+      if (
+        isTutorialActive &&
+        currentStepId === "home-date"
+      ) {
+        runTourAction("home-date-picker", {
+          skipExecute: true,
+        });
+      }
+    }, [
+      currentStepId,
+      isTutorialActive,
+      runTourAction,
+    ]);
+
+  useEffect(() => {
+    return registerTutorialAction(
+      "home-date-picker",
+      () => {
+        setCalendarOpen((open) => !open);
+      }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (
+      isTutorialActive &&
+      currentStepId !== "home-date"
+    ) {
+      setCalendarOpen(false);
+    }
+  }, [currentStepId, isTutorialActive]);
 
   const weekDates = useMemo(
     () => getWeekDates(weekOffset),
@@ -117,28 +204,16 @@ export default function Home() {
         task.date === activeDate
     );
 
-  const activeShift =
-    shifts.find(
-      (shift) =>
-        shift.date === activeDate
+  const activeDayShifts =
+    getTemplatesForDate(
+      activeDate,
+      shifts,
+      templates
     );
 
-  const activeTemplate =
-    activeShift
-      ? templates.find(
-          (template) =>
-            template.id ===
-            activeShift.templateId
-        )
-      : null;
-
-  const activeMemos =
-    isViewingToday
-      ? memos.filter(
-          (memo) =>
-            memo.date === todayString
-        )
-      : [];
+  const activeMemos = memos.filter(
+    (memo) => memo.date === activeDate
+  );
 
   const remainingCount =
     activeTasks.filter(
@@ -174,24 +249,13 @@ export default function Home() {
     );
   }
 
-  function getShiftForDate(
+  function getDayShiftsForDate(
     date: Date
   ) {
-    const target =
-      formatDate(date);
-
-    const shift = shifts.find(
-      (s) => s.date === target
-    );
-
-    if (!shift) {
-      return null;
-    }
-
-    return templates.find(
-      (template) =>
-        template.id ===
-        shift.templateId
+    return getTemplatesForDate(
+      formatDate(date),
+      shifts,
+      templates
     );
   }
 
@@ -211,8 +275,8 @@ export default function Home() {
       getTasksForDate(date);
     const dayDeadlines =
       getDeadlinesForDate(date);
-    const shift =
-      getShiftForDate(date);
+    const dayShifts =
+      getDayShiftsForDate(date);
     const taskLimit =
       dayDeadlines.length > 0
         ? 1
@@ -220,9 +284,44 @@ export default function Home() {
 
     return (
       <>
-        {shift && (
-          <div className={`mb-2 rounded-xl px-2 py-1 ${theme.bgSoft} ${theme.text10}`}>
-            仕事
+        {(dayShifts.work ||
+          dayShifts.schedule) && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {dayShifts.work && (
+              <span
+                className={`
+                  rounded-md
+                  px-1.5
+                  py-0.5
+                  text-[9px]
+                  font-medium
+                  ${theme.bgSoft}
+                  ${theme.text10}
+                `}
+              >
+                仕
+              </span>
+            )}
+
+            {dayShifts.schedule && (
+              <span
+                className="
+                  rounded-md
+                  px-1.5
+                  py-0.5
+                  text-[9px]
+                  font-medium
+                  border
+                  border-violet-300/70
+                  bg-[color-mix(in_srgb,#8b5cf6_14%,transparent)]
+                  text-violet-700
+                  dark:border-violet-800/55
+                  dark:text-violet-300
+                "
+              >
+                予
+              </span>
+            )}
           </div>
         )}
 
@@ -255,7 +354,8 @@ export default function Home() {
         <div className="space-y-1 overflow-hidden">
           {dayTasks.length ===
             0 &&
-            !shift &&
+            !dayShifts.work &&
+            !dayShifts.schedule &&
             dayDeadlines.length ===
               0 && (
               <p className="text-[10px] text-zinc-300 dark:text-zinc-500">
@@ -354,6 +454,13 @@ export default function Home() {
     saveMemosRepo(updated);
   }
 
+  function goToDate(dateString: string) {
+    setSelectedDay(dateString);
+    setWeekOffset(
+      getWeekOffsetForDate(dateString)
+    );
+  }
+
   const topDays =
     weekDates.slice(0, 4);
 
@@ -370,19 +477,38 @@ export default function Home() {
           <div>
 
             <p className={appSurfaces.mutedLabel}>
-              illustrator workflow
+              home
             </p>
 
             <h1 className={`mt-1 ${appSurfaces.pageTitle}`}>
-              atelier-flow
+              ホーム
             </h1>
 
           </div>
 
-          <div className={appSurfaces.glassBadge}>
-            {today.getMonth() + 1}/
-            {today.getDate()}
-          </div>
+          <SimpleDatePicker
+            open={calendarOpen}
+            onClose={() =>
+              setCalendarOpen(false)
+            }
+            selectedDate={activeDate}
+            onSelectDate={goToDate}
+          >
+            <button
+              type="button"
+              data-tour="home-date-picker"
+              onClick={handleDatePickerClick}
+              className={`
+                ${appSurfaces.glassBadge}
+                transition-all
+                hover:scale-[1.02]
+                active:scale-[0.98]
+              `}
+            >
+              {new Date(activeDate).getMonth() + 1}/
+              {new Date(activeDate).getDate()}
+            </button>
+          </SimpleDatePicker>
 
         </div>
 
@@ -457,32 +583,66 @@ export default function Home() {
 
             </div>
 
-            {activeTemplate && (
+            {(activeDayShifts.work ||
+              activeDayShifts.schedule) && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {activeDayShifts.work && (
+                  <div
+                    className={`
+                      min-w-0
+                      flex-1
+                      rounded-2xl
+                      border
+                      ${theme.border}
+                      ${theme.bgSoft}
+                      px-3
+                      py-2.5
+                    `}
+                  >
+                    <p className={theme.textXs}>
+                      {getShiftKindLabel(
+                        activeDayShifts.work
+                      )}
+                    </p>
 
-              <div
-                className={`
-                  mb-4
-                  rounded-2xl
-                  border
-                  ${theme.border}
-                  ${theme.bgSoft}
-                  px-4
-                  py-3
-                `}
-              >
+                    <p
+                      className={`mt-0.5 text-xs font-medium ${appSurfaces.bodyText}`}
+                    >
+                      {formatShiftTimeRange(
+                        activeDayShifts.work
+                      )}
+                    </p>
+                  </div>
+                )}
 
-                <p className={theme.textXs}>
-                  シフト
-                </p>
+                {activeDayShifts.schedule && (
+                  <div
+                    className="
+                      min-w-0
+                      flex-1
+                      rounded-2xl
+                      border
+                      border-violet-300/70
+                      bg-[color-mix(in_srgb,#8b5cf6_12%,transparent)]
+                      px-3
+                      py-2.5
+                      dark:border-violet-800/55
+                    "
+                  >
+                    <p className="text-xs text-violet-600 dark:text-violet-300">
+                      予定
+                    </p>
 
-                <p className={`mt-1 text-sm font-medium ${appSurfaces.bodyText}`}>
-                  {activeTemplate.start}
-                  〜
-                  {activeTemplate.end}
-                </p>
-
+                    <p
+                      className={`mt-0.5 text-xs font-medium ${appSurfaces.bodyText}`}
+                    >
+                      {formatShiftTimeRange(
+                        activeDayShifts.schedule
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
-
             )}
 
             {activeDeadlines.length >
@@ -530,7 +690,8 @@ export default function Home() {
               {activeTasks.length ===
                 0 &&
                 activeMemos.length === 0 &&
-                !activeTemplate &&
+                !activeDayShifts.work &&
+                !activeDayShifts.schedule &&
                 activeDeadlines.length ===
                   0 && (
 
@@ -551,6 +712,7 @@ export default function Home() {
                     ${appSurfaces.taskButton}
                     border-violet-200/80
                     dark:border-violet-900/40
+
                     ${
                       memo.isCompleted
                         ? `
@@ -570,43 +732,61 @@ export default function Home() {
                       </p>
 
                       <p
-                        className={`mt-1 text-sm font-medium transition-all ${
-                          memo.isCompleted
-                            ? "line-through text-zinc-400 dark:text-zinc-500"
-                            : appSurfaces.bodyText
-                        }`}
+                        className={`
+                          mt-1
+                          text-sm
+                          font-medium
+                          transition-all
+
+                          ${
+                            memo.isCompleted
+                              ? "line-through text-zinc-400 dark:text-zinc-500"
+                              : appSurfaces.bodyText
+                          }
+                        `}
                       >
                         {getMemoText(memo)}
                       </p>
                     </div>
 
-                    <div
-                      className="
-                        ml-4
-                        flex
-                        h-6
-                        w-6
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-full
-                        border
-                        text-xs
-                        transition-all
-                      "
-                      style={{
-                        background: memo.isCompleted
-                          ? "var(--theme-accent)"
-                          : "transparent",
-                        borderColor: memo.isCompleted
-                          ? "var(--theme-accent)"
-                          : "#d4d4d8",
-                        color: memo.isCompleted
-                          ? "white"
-                          : "transparent",
-                      }}
-                    >
-                      ✓
+                    <div className="ml-4 pt-1">
+                      <div
+                        className={`
+                          flex
+                          h-6
+                          w-6
+                          items-center
+                          justify-center
+                          rounded-full
+                          border
+                          text-[11px]
+                          font-medium
+                          transition-all
+                          duration-300
+
+                          ${
+                            memo.isCompleted
+                              ? `
+                                scale-105
+                                text-white
+                              `
+                              : `
+                                bg-white
+                                text-transparent
+                              `
+                          }
+                        `}
+                        style={{
+                          background: memo.isCompleted
+                            ? "var(--theme-accent)"
+                            : "white",
+                          borderColor: memo.isCompleted
+                            ? "var(--theme-accent)"
+                            : "#d4d4d8",
+                        }}
+                      >
+                        ✓
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -817,11 +997,7 @@ export default function Home() {
 
                   ${
                     isSelected
-                      ? `
-                        ${theme.borderAccent}
-                        ${theme.bgSofter}
-                        ${theme.shadow}
-                      `
+                      ? appSurfaces.weekDaySelected
                       : isToday
                       ? `
                         ${theme.border}
@@ -916,11 +1092,7 @@ export default function Home() {
 
                   ${
                     isSelected
-                      ? `
-                        ${theme.borderAccent}
-                        ${theme.bgSofter}
-                        ${theme.shadow}
-                      `
+                      ? appSurfaces.weekDaySelected
                       : isToday
                       ? `
                         ${theme.border}

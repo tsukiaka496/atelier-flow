@@ -167,64 +167,6 @@ export default function SettingsPage() {
           className={`mb-6 p-5 ${appSurfaces.card}`}
         >
           <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
-            バックアップ
-          </p>
-
-          <div className="space-y-3">
-            <button
-              onClick={
-                handleExport
-              }
-              className="
-                w-full
-                rounded-2xl
-                px-4
-                py-3
-                text-sm
-                text-white
-              "
-              style={{
-                background:
-                  theme.accent,
-              }}
-            >
-              JSONを書き出す
-            </button>
-
-            <button
-              onClick={() =>
-                fileInputRef.current?.click()
-              }
-              className="
-                w-full
-                rounded-2xl
-                border border-zinc-200
-                bg-white
-                px-4
-                py-3
-                text-sm
-                text-zinc-600
-              "
-            >
-              JSONを読み込む
-            </button>
-
-            <input
-              type="file"
-              accept=".json"
-              ref={fileInputRef}
-              onChange={
-                handleImport
-              }
-              className="hidden"
-            />
-          </div>
-        </div>
-
-        <div
-          className={`mb-6 p-5 ${appSurfaces.card}`}
-        >
-          <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
             表示
           </p>
 
@@ -280,6 +222,67 @@ export default function SettingsPage() {
             });
           }}
         />
+
+        <div
+          className={`mb-6 p-5 ${appSurfaces.card}`}
+        >
+          <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
+            バックアップ
+          </p>
+
+          <div className="space-y-3">
+            <button
+              onClick={
+                handleExport
+              }
+              className="
+                w-full
+                rounded-2xl
+                px-4
+                py-3
+                text-sm
+                text-white
+              "
+              style={{
+                background:
+                  theme.accent,
+              }}
+            >
+              JSONを書き出す
+            </button>
+
+            <button
+              onClick={() =>
+                fileInputRef.current?.click()
+              }
+              className="
+                w-full
+                rounded-2xl
+                border border-zinc-200
+                bg-white
+                px-4
+                py-3
+                text-sm
+                text-zinc-600
+                dark:border-zinc-700
+                dark:bg-zinc-900
+                dark:text-zinc-300
+              "
+            >
+              JSONを読み込む
+            </button>
+
+            <input
+              type="file"
+              accept=".json"
+              ref={fileInputRef}
+              onChange={
+                handleImport
+              }
+              className="hidden"
+            />
+          </div>
+        </div>
 
         <div
           className="

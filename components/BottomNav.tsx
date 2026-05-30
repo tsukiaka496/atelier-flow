@@ -58,6 +58,44 @@ export default function BottomNav() {
       ? theme.navActive
       : appSurfaces.navLink;
 
+  const navItems = [
+    {
+      href: "/",
+      label: "ホーム",
+      tourId: "nav-home" as const,
+      instance: homeInstance,
+      onClick: triggerHome,
+    },
+    {
+      href: "/month",
+      label: "月",
+      tourId: "nav-month" as const,
+      instance: monthInstance,
+      onClick: triggerMonth,
+    },
+    {
+      href: "/projects",
+      label: "案件",
+      tourId: "nav-projects" as const,
+      instance: projectsInstance,
+      onClick: triggerProjects,
+    },
+    {
+      href: "/memos",
+      label: "メモ",
+      tourId: "nav-memos" as const,
+      instance: memosInstance,
+      onClick: triggerMemos,
+    },
+    {
+      href: "/settings",
+      label: "設定",
+      tourId: "nav-settings" as const,
+      instance: settingsInstance,
+      onClick: triggerSettings,
+    },
+  ];
+
   return (
     <div
       className={`
@@ -65,61 +103,51 @@ export default function BottomNav() {
         bottom-5
         left-1/2
         z-40
-        flex
         w-[92%]
         max-w-md
         -translate-x-1/2
-        items-center
-        justify-between
-        px-3
-        py-4
+        px-4
+        py-3
         ${appSurfaces.nav}
       `}
     >
-      <Link
-        href="/"
-        className={`text-xs sm:text-sm ${linkClass("/")}`}
-        {...tourInstanceProps("nav-home", homeInstance)}
-        onClick={triggerHome}
+      <nav
+        className="
+          grid
+          grid-cols-5
+          items-center
+          gap-1
+        "
       >
-        ホーム
-      </Link>
-
+      {navItems.map((item) => (
       <Link
-        href="/projects"
-        className={`text-xs sm:text-sm ${linkClass("/projects")}`}
-        {...tourInstanceProps("nav-projects", projectsInstance)}
-        onClick={triggerProjects}
+        key={item.href}
+        href={item.href}
+        className={`
+          flex
+          min-w-0
+          flex-col
+          items-center
+          justify-center
+          rounded-2xl
+          px-1
+          py-2
+          text-center
+          text-[11px]
+          leading-tight
+          sm:text-xs
+          ${linkClass(item.href)}
+        `}
+        {...tourInstanceProps(
+          item.tourId,
+          item.instance
+        )}
+        onClick={item.onClick}
       >
-        案件
+        {item.label}
       </Link>
-
-      <Link
-        href="/memos"
-        className={`text-xs sm:text-sm ${linkClass("/memos")}`}
-        {...tourInstanceProps("nav-memos", memosInstance)}
-        onClick={triggerMemos}
-      >
-        メモ
-      </Link>
-
-      <Link
-        href="/month"
-        className={`text-xs sm:text-sm ${linkClass("/month")}`}
-        {...tourInstanceProps("nav-month", monthInstance)}
-        onClick={triggerMonth}
-      >
-        月
-      </Link>
-
-      <Link
-        href="/settings"
-        className={`text-xs sm:text-sm ${linkClass("/settings")}`}
-        {...tourInstanceProps("nav-settings", settingsInstance)}
-        onClick={triggerSettings}
-      >
-        設定
-      </Link>
+      ))}
+      </nav>
     </div>
   );
 }

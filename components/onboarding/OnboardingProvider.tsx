@@ -28,6 +28,7 @@ import {
 import {
   executeTourAction,
   isTutorialReady,
+  registerTutorialAction,
   registerTutorialReadyCheck,
   runTutorialHook,
 } from "@/lib/tutorialActionRegistry";
@@ -398,6 +399,13 @@ export default function OnboardingProvider({
   }, [tutorialModalOpen]);
 
   useEffect(() => {
+    return registerTutorialAction(
+      "tutorial-advance-next",
+      () => {}
+    );
+  }, []);
+
+  useEffect(() => {
     if (sessionHydratedRef.current) {
       return;
     }
@@ -513,12 +521,7 @@ export default function OnboardingProvider({
 
     let nextSettings = getOnboarding();
 
-    for (const tab of [
-      "tasks",
-      "month",
-      "memo",
-      "settings",
-    ] as TutorialTabId[]) {
+    for (const tab of TUTORIAL_TAB_ORDER) {
       nextSettings = mergeTabProgress(
         nextSettings,
         tab,
@@ -1506,7 +1509,7 @@ export default function OnboardingProvider({
       }
 
       const targetTab =
-        explicitTab ?? incompleteTab ?? "tasks";
+        explicitTab ?? incompleteTab ?? "home";
 
       const firstStepId =
         getStartStepForTab(targetTab);
@@ -1538,7 +1541,7 @@ export default function OnboardingProvider({
       if (
         pathname !== "/" &&
         !tab &&
-        targetTab === "tasks"
+        (targetTab === "home" || targetTab === "tasks")
       ) {
         router.push("/");
       }

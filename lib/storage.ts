@@ -24,20 +24,29 @@ export type Project = {
   color: string;
   deadline: string;
   tasks: Task[];
+  /** 作業がない案件の手動完了（100% / 0%） */
+  manualCompleted?: boolean;
   /** チュートリアルで作成した案件（将来の除外/分析用） */
   isTutorial?: boolean;
 };
+
+export type ShiftTemplateKind =
+  | "work"
+  | "schedule";
 
 export type ShiftTemplate = {
   id: string;
   name: string;
   start: string;
   end: string;
+  kind?: ShiftTemplateKind;
 };
 
 export type Shift = {
   date: string;
   templateId: string;
+  /** 同日に仕事・予定を両方置けるよう種別を保持 */
+  kind?: ShiftTemplateKind;
 };
 
 export type Memo = {
@@ -53,9 +62,10 @@ export type Memo = {
 };
 
 export type TutorialTabId =
+  | "home"
+  | "month"
   | "tasks"
   | "memo"
-  | "month"
   | "settings";
 
 export type TutorialTabProgress = {
@@ -339,10 +349,85 @@ export function normalizeProject(
 
     tasks: tasksRaw.map(normalizeTask),
 
+    manualCompleted:
+      typeof project?.manualCompleted === "boolean"
+        ? project.manualCompleted
+        : undefined,
+
     isTutorial:
       typeof project?.isTutorial === "boolean"
         ? project.isTutorial
         : undefined,
+  };
+}
+
+export function normalizeShiftTemplate(
+  raw: unknown
+): ShiftTemplate {
+  const template = raw as Record<string, unknown>;
+
+  const kind =
+    template?.kind === "schedule"
+      ? "schedule"
+      : "work";
+
+  return {
+    id: String(
+      template?.id ?? crypto.randomUUID()
+    ),
+    name:
+      typeof template?.name === "string"
+        ? template.name
+        : "",
+    start:
+      typeof template?.start === "string"
+        ? template.start
+        : "",
+    end:
+      typeof template?.end === "string"
+        ? template.end
+        : "",
+    kind,
+  };
+}
+
+export function normalizeShift(
+  raw: unknown,
+  templates: ShiftTemplate[] = []
+): Shift {
+  const shift = raw as Record<string, unknown>;
+  const templateId = String(
+    shift?.templateId ?? ""
+  );
+
+  let kind: ShiftTemplateKind =
+    shift?.kind === "schedule"
+      ? "schedule"
+      : "work";
+
+  if (
+    shift?.kind !== "schedule" &&
+    shift?.kind !== "work"
+  ) {
+    const template = templates.find(
+      (item) => item.id === templateId
+    );
+
+    if (template) {
+      kind =
+        template.kind === "schedule"
+          ? "schedule"
+          : "work";
+    }
+  }
+
+  return {
+    date:
+      typeof shift?.date === "string"
+        ? shift.date
+        : "",
+    templateId,
+    kind,
   };
 }
 
@@ -471,7 +556,16 @@ export function getShiftTemplates(): ShiftTemplate[] {
   }
 
   try {
-    shiftTemplatesSnapshot = JSON.parse(data);
+    const parsed = JSON.parse(data);
+
+    if (!Array.isArray(parsed)) {
+      shiftTemplatesSnapshot = EMPTY_SHIFT_TEMPLATES;
+      return shiftTemplatesSnapshot;
+    }
+
+    shiftTemplatesSnapshot = parsed.map(
+      normalizeShiftTemplate
+    );
     return shiftTemplatesSnapshot;
   } catch {
     shiftTemplatesSnapshot = EMPTY_SHIFT_TEMPLATES;
@@ -482,7 +576,10 @@ export function getShiftTemplates(): ShiftTemplate[] {
 export function saveShiftTemplates(
   templates: ShiftTemplate[]
 ) {
-  const json = JSON.stringify(templates);
+  const normalized = templates.map(
+    normalizeShiftTemplate
+  );
+  const json = JSON.stringify(normalized);
 
   localStorage.setItem(
     SHIFT_TEMPLATE_KEY,
@@ -490,7 +587,7 @@ export function saveShiftTemplates(
   );
 
   shiftTemplatesSnapshotKey = json;
-  shiftTemplatesSnapshot = templates;
+  shiftTemplatesSnapshot = normalized;
 
   notifyShiftsChanged();
 }
@@ -525,7 +622,17 @@ export function getShifts(): Shift[] {
   }
 
   try {
-    shiftsSnapshot = JSON.parse(data);
+    const parsed = JSON.parse(data);
+    const templates = getShiftTemplates();
+
+    if (!Array.isArray(parsed)) {
+      shiftsSnapshot = EMPTY_SHIFTS;
+      return shiftsSnapshot;
+    }
+
+    shiftsSnapshot = parsed.map((item) =>
+      normalizeShift(item, templates)
+    );
     return shiftsSnapshot;
   } catch {
     shiftsSnapshot = EMPTY_SHIFTS;
@@ -536,7 +643,11 @@ export function getShifts(): Shift[] {
 export function saveShifts(
   shifts: Shift[]
 ) {
-  const json = JSON.stringify(shifts);
+  const templates = getShiftTemplates();
+  const normalized = shifts.map((item) =>
+    normalizeShift(item, templates)
+  );
+  const json = JSON.stringify(normalized);
 
   localStorage.setItem(
     SHIFT_KEY,
@@ -544,7 +655,7 @@ export function saveShifts(
   );
 
   shiftsSnapshotKey = json;
-  shiftsSnapshot = shifts;
+  shiftsSnapshot = normalized;
 
   notifyShiftsChanged();
 }

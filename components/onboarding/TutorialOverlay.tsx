@@ -320,15 +320,18 @@ const TooltipPanel = memo(function TooltipPanel({
     tabLabel: string;
   };
 }) {
-  const panelClass = layout.compactMode
+  const useCompact =
+    layout.compactMode || step.id !== "finish";
+
+  const panelClass = useCompact
     ? tutorialTheme.tooltipPanelCompact
     : tutorialTheme.tooltipPanel;
 
-  const titleClass = layout.compactMode
+  const titleClass = useCompact
     ? tutorialTheme.tooltipTitleCompact
     : tutorialTheme.tooltipTitle;
 
-  const bodyClass = layout.compactMode
+  const bodyClass = useCompact
     ? tutorialTheme.tooltipBodyCompact
     : tutorialTheme.tooltipBody;
 
@@ -399,12 +402,26 @@ const TooltipPanel = memo(function TooltipPanel({
             {step.title}
           </p>
 
-          {stepProgress.total > 0 && (
-            <p className="mt-1 text-[11px] text-zinc-400">
-              {stepProgress.tabLabel}{" "}
-              {stepProgress.current}/{stepProgress.total}
-            </p>
-          )}
+          <div className="mt-1 flex items-center gap-2">
+            {stepProgress.total > 0 && (
+              <span
+                className="
+                  rounded-full
+                  bg-zinc-100
+                  px-2
+                  py-0.5
+                  text-[10px]
+                  font-medium
+                  text-zinc-500
+                  dark:bg-zinc-800
+                  dark:text-zinc-400
+                "
+              >
+                {stepProgress.tabLabel}{" "}
+                {stepProgress.current}/{stepProgress.total}
+              </span>
+            )}
+          </div>
 
           <p id={bodyId} className={bodyClass}>
             {step.body}
@@ -412,24 +429,36 @@ const TooltipPanel = memo(function TooltipPanel({
 
           <div
             className={`flex items-center justify-between gap-2 ${
-              layout.compactMode ? "mt-3" : "mt-4"
+              useCompact ? "mt-3" : "mt-4"
             }`}
           >
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-col gap-0.5">
               <button
                 type="button"
                 onClick={() => onSkipTab()}
-                className={tutorialTheme.skipButton}
+                className={`
+                  ${tutorialTheme.skipButton}
+                  !px-2 !py-1.5 text-left
+                `}
               >
-                タブをスキップ
+                この章をスキップ
               </button>
 
               <button
                 type="button"
                 onClick={() => onSkip()}
-                className={tutorialTheme.skipButton}
+                className="
+                  pointer-events-auto
+                  px-2
+                  py-0.5
+                  text-left
+                  text-[10px]
+                  text-zinc-400
+                  underline-offset-2
+                  hover:underline
+                "
               >
-                全体スキップ
+                ガイドを終了
               </button>
             </div>
 
@@ -454,8 +483,15 @@ const TooltipPanel = memo(function TooltipPanel({
                 完了
               </button>
             ) : (
-              <p className={tutorialTheme.tooltipHint}>
-                ハイライト部分を押してね
+              <p
+                className={`
+                  ${tutorialTheme.tooltipHint}
+                  max-w-[9rem]
+                  text-right
+                  leading-snug
+                `}
+              >
+                光っている所をタップ
               </p>
             )}
           </div>

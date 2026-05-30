@@ -4,6 +4,10 @@ import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
 
 import { tutorialTheme } from "@/lib/tutorialTheme";
+import {
+  TUTORIAL_TAB_LABELS,
+  TUTORIAL_TAB_ORDER,
+} from "@/lib/tutorialSteps";
 
 function subscribeMounted() {
   return () => {};
@@ -53,27 +57,48 @@ export default function WelcomeOverlay({
           w-full
           max-w-md
           [grid-area:1/1]
-          rounded-[30px]
+          rounded-[28px]
           border border-zinc-200
           bg-white
-          p-6
+          p-5
           shadow-[0_4px_16px_rgba(0,0,0,0.08)]
+          dark:border-zinc-700
+          dark:bg-zinc-900
         "
       >
-        <p className="text-sm text-zinc-500">
-          welcome
+        <p className="text-xs text-zinc-400">
+          はじめに
         </p>
-        <h2 className="mt-1 text-xl font-semibold text-zinc-800">
-          Atelier Flowへようこそ
+        <h2 className="mt-0.5 text-lg font-semibold text-zinc-800 dark:text-zinc-100">
+          使い方ガイド
         </h2>
 
-        <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-          イラスト制作を整理するアプリです。
-          <br />
-          実際に触りながら使ってみましょう。
+        <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          短いステップで、ホーム・月・案件・メモ・設定の流れを確認します。
         </p>
 
-        <div className="mt-6 flex items-center justify-between gap-3">
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {TUTORIAL_TAB_ORDER.map((tab) => (
+            <span
+              key={tab}
+              className="
+                rounded-full
+                bg-zinc-100
+                px-2.5
+                py-1
+                text-[10px]
+                font-medium
+                text-zinc-600
+                dark:bg-zinc-800
+                dark:text-zinc-300
+              "
+            >
+              {TUTORIAL_TAB_LABELS[tab]}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onSkip}

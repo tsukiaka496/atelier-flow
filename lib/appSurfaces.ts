@@ -190,6 +190,25 @@ export const appSurfaces = {
     bg-white
     dark:bg-zinc-900/90
   `,
+  weekDaySelected: `
+    border-[var(--theme-accent)]
+    bg-[color-mix(in_srgb,var(--theme-accent)_14%,transparent)]
+    shadow-[0_4px_16px_color-mix(in_srgb,var(--theme-accent-shadow)_45%,transparent)]
+    dark:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]
+  `,
+  monthDayShiftWork: `
+    border-[var(--theme-accent-border)]
+    bg-[color-mix(in_srgb,var(--theme-accent)_14%,transparent)]
+  `,
+  monthDayShiftSchedule: `
+    border-violet-300/70
+    bg-[color-mix(in_srgb,#8b5cf6_14%,transparent)]
+    dark:border-violet-800/55
+  `,
+  monthDayToday: `
+    ring-2
+    ring-[color-mix(in_srgb,var(--theme-accent-border)_50%,transparent)]
+  `,
   monthDayIdle: `
     border-zinc-200
     bg-white

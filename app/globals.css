@@ -36,8 +36,9 @@ html.tutorial-active {
 }
 
 [data-tour="create-project"],
-[data-tour="tutorial-fill-example"],
-[data-tour="month-template-add"] {
+[data-tour="month-template-add"],
+[data-tour="home-date-picker"],
+[data-tour="week-calendar"] {
   scroll-margin-top: 96px;
   scroll-margin-bottom: 32px;
 }
@@ -132,7 +133,42 @@ html.tutorial-active {
   }
 }
 
+.memo-complete-exit {
+  animation: memo-complete-exit 0.48s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes memo-complete-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    max-height: 120px;
+  }
+
+  35% {
+    opacity: 1;
+    transform: scale(0.99);
+    max-height: 120px;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .memo-complete-exit {
+    animation: none;
+    opacity: 0;
+    max-height: 0;
+  }
+
   .tutorial-mask-nudge {
     animation: none;
   }

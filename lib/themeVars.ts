@@ -23,7 +23,7 @@ export function getAccentCssVars(
   return {
     ["--theme-accent" as string]: accent,
     ["--theme-accent-soft" as string]: `rgba(${r}, ${g}, ${b}, 0.14)`,
-    ["--theme-accent-softer" as string]: `rgba(${r}, ${g}, ${b}, 0.06)`,
+    ["--theme-accent-softer" as string]: `rgba(${r}, ${g}, ${b}, 0.18)`,
     ["--theme-accent-border" as string]: `rgba(${r}, ${g}, ${b}, 0.28)`,
     ["--theme-accent-shadow" as string]: `rgba(${r}, ${g}, ${b}, 0.25)`,
     ["--theme-accent-shadow-soft" as string]: `rgba(${r}, ${g}, ${b}, 0.18)`,

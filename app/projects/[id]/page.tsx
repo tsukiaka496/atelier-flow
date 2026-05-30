@@ -27,6 +27,10 @@ import TaskEditorSheet from "@/components/TaskEditorSheet";
 import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 import { appSurfaces } from "@/lib/appSurfaces";
 import { useTourAction } from "@/lib/useTourAction";
+import {
+  getProjectProgress,
+  isProjectFullyCompleted,
+} from "@/lib/projectProgress";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -75,24 +79,7 @@ export default function ProjectDetailPage() {
   const currentProject = project;
 
   function getProgress() {
-    if (
-      currentProject.tasks.length === 0
-    ) {
-      return 0;
-    }
-
-    const completed =
-      currentProject.tasks.filter(
-        (task) => task.completed
-      ).length;
-
-    return Math.round(
-      (
-        completed /
-        currentProject.tasks.length
-      ) *
-        100
-    );
+    return getProjectProgress(currentProject);
   }
 
   function getDaysLeft() {
@@ -147,6 +134,36 @@ export default function ProjectDetailPage() {
     const day = date.getDate();
 
     return `${month}月${day}日`;
+  }
+
+  function toggleAllTasks() {
+    let updatedProject: Project;
+
+    if (currentProject.tasks.length === 0) {
+      updatedProject = {
+        ...currentProject,
+        manualCompleted:
+          !currentProject.manualCompleted,
+      };
+    } else {
+      const markComplete =
+        !isProjectFullyCompleted(currentProject);
+
+      updatedProject = {
+        ...currentProject,
+        tasks: currentProject.tasks.map((task) => ({
+          ...task,
+          completed: markComplete,
+        })),
+      };
+    }
+
+    const projects = getProjectsRepo();
+    const updatedProjects = projects.map((p) =>
+      p.id === updatedProject.id ? updatedProject : p
+    );
+
+    saveProjectsRepo(updatedProjects);
   }
 
   function toggleTask(taskId: string) {
@@ -279,6 +296,12 @@ export default function ProjectDetailPage() {
   const progress = getProgress();
 
   const daysLeft = getDaysLeft();
+
+  const isFullyCompleted =
+    isProjectFullyCompleted(currentProject);
+  const bulkActionLabel = isFullyCompleted
+    ? "全解除"
+    : "全完了";
 
   return (
     <ThemedMain className="px-5 py-8 pb-32">
@@ -470,22 +493,45 @@ export default function ProjectDetailPage() {
         {/* 作業 */}
         <div className="mt-6">
 
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between gap-3">
 
             <h2 className="text-lg font-semibold">
               作業
             </h2>
 
-            <p className="text-sm text-zinc-400 dark:text-zinc-500">
-              {
-                currentProject.tasks.filter(
-                  (task) =>
-                    task.completed
-                ).length
-              }
-              /
-              {currentProject.tasks.length}
-            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleAllTasks}
+                className="
+                  rounded-full
+                  bg-white/80 dark:bg-zinc-900/85
+                  px-3
+                  py-1.5
+                  text-xs
+                  font-medium
+                  text-zinc-600 dark:text-zinc-300
+                  border border-white/60 dark:border-zinc-700/50
+                "
+                style={{
+                  borderColor: `${currentProject.color}50`,
+                  color: currentProject.color,
+                }}
+              >
+                {bulkActionLabel}
+              </button>
+
+              <p className="text-sm text-zinc-400 dark:text-zinc-500 shrink-0">
+                {
+                  currentProject.tasks.filter(
+                    (task) =>
+                      task.completed
+                  ).length
+                }
+                /
+                {currentProject.tasks.length}
+              </p>
+            </div>
 
           </div>
 
@@ -504,8 +550,29 @@ export default function ProjectDetailPage() {
                   <div
                     key={task.id}
                     data-tour={index === 0 ? "project-task-toggle" : undefined}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      toggleTask(task.id);
+                      if (index === 0) {
+                        triggerTaskToggle();
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        toggleTask(task.id);
+                        if (index === 0) {
+                          triggerTaskToggle();
+                        }
+                      }
+                    }}
                     className="
                       w-full
+                      cursor-pointer
                       rounded-[24px]
                       border border-white/60 dark:border-zinc-700/50
                       bg-white/70 dark:bg-zinc-900/75
@@ -526,16 +593,7 @@ export default function ProjectDetailPage() {
 
                     <div className="flex items-start justify-between">
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          toggleTask(task.id);
-                          if (index === 0) {
-                            triggerTaskToggle();
-                          }
-                        }}
-                        className="min-w-0 flex-1 text-left"
-                      >
+                      <div className="min-w-0 flex-1">
 
                         <p
                           className="
@@ -587,16 +645,16 @@ export default function ProjectDetailPage() {
 
                         </div>
 
-                      </button>
+                      </div>
 
-                      {/* チェック */}
                       <div className="ml-4 flex items-start gap-2">
                         <button
                           type="button"
                           data-tour={
                             index === 0 ? "project-task-edit" : undefined
                           }
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             openTaskEditor(task.id);
                             if (index === 0) {
                               triggerTaskEdit();
@@ -620,12 +678,14 @@ export default function ProjectDetailPage() {
                             flex
                             h-6
                             w-6
+                            shrink-0
                             items-center
                             justify-center
                             rounded-full
                             border
                             text-xs
                             transition-all
+                            pointer-events-none
                           "
                           style={{
                             background: task.completed
