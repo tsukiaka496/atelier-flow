@@ -109,7 +109,7 @@ const MONTH_STEPS: GuidedStep[] = [
     target: '[data-tour="month-template-add"]',
     title: "テンプレを追加",
     body: "「仕事」か「予定」を選び、時間なしでも追加できます。",
-    placement: "auto",
+    placement: "top",
     advance: {
       type: "click",
       tourId: "month-template-add",

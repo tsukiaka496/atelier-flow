@@ -143,7 +143,7 @@ function TooltipArrow({
         className={tutorialTheme.tooltipArrow}
         style={{
           ...base,
-          top: -6,
+          top: 4,
           borderBottomColor: "transparent",
           borderRightColor: "transparent",
         }}
@@ -158,7 +158,7 @@ function TooltipArrow({
         className={tutorialTheme.tooltipArrow}
         style={{
           ...base,
-          bottom: -6,
+          bottom: 4,
           borderTopColor: "transparent",
           borderLeftColor: "transparent",
         }}

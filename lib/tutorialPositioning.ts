@@ -44,7 +44,9 @@ export type TooltipLayoutResult = {
   debug: TooltipLayoutDebug;
 };
 
-const TOOLTIP_GAP = 12;
+const TOOLTIP_GAP = 14;
+const ARROW_CLEARANCE = 10;
+const ARROW_SIZE = 12;
 const MIN_TARGET_VISIBLE_RATIO = 0.95;
 const SCROLL_MARGIN_TOP = 120;
 const SCROLL_MARGIN_BOTTOM = 180;
@@ -263,6 +265,63 @@ export function doesTooltipOverlapTarget(
   return rectsOverlap(tooltip, target, gap);
 }
 
+function getArrowFootprint(
+  tooltip: BoxRect,
+  placement: TooltipPlacement,
+  arrowOffsetX: number
+): BoxRect | null {
+  if (placement !== "top" && placement !== "bottom") {
+    return null;
+  }
+
+  const centerX =
+    tooltip.left +
+    tooltip.width / 2 +
+    arrowOffsetX;
+
+  if (placement === "bottom") {
+    return {
+      top:
+        tooltip.top -
+        ARROW_SIZE -
+        ARROW_CLEARANCE,
+      left: centerX - ARROW_SIZE / 2,
+      width: ARROW_SIZE,
+      height: ARROW_SIZE + ARROW_CLEARANCE,
+    };
+  }
+
+  return {
+    top: tooltip.top + tooltip.height,
+    left: centerX - ARROW_SIZE / 2,
+    width: ARROW_SIZE,
+    height: ARROW_SIZE + ARROW_CLEARANCE,
+  };
+}
+
+function doesTooltipOrArrowOverlapTarget(
+  tooltip: BoxRect,
+  target: BoxRect,
+  placement: TooltipPlacement,
+  arrowOffsetX: number
+): boolean {
+  if (doesTooltipOverlapTarget(tooltip, target)) {
+    return true;
+  }
+
+  const arrow = getArrowFootprint(
+    tooltip,
+    placement,
+    arrowOffsetX
+  );
+
+  if (!arrow) {
+    return false;
+  }
+
+  return doesTooltipOverlapTarget(arrow, target, 4);
+}
+
 function fitsInBounds(
   tooltip: BoxRect,
   bounds: BoxRect
@@ -407,7 +466,8 @@ function computeCandidatePosition(
         top:
           targetRect.top +
           targetRect.height +
-          TOOLTIP_GAP,
+          TOOLTIP_GAP +
+          ARROW_CLEARANCE,
         left: targetCenterX - tooltipWidth / 2,
         width: tooltipWidth,
         height: tooltipHeight,
@@ -417,7 +477,8 @@ function computeCandidatePosition(
         top:
           targetRect.top -
           tooltipHeight -
-          TOOLTIP_GAP,
+          TOOLTIP_GAP -
+          ARROW_CLEARANCE,
         left: targetCenterX - tooltipWidth / 2,
         width: tooltipWidth,
         height: tooltipHeight,
@@ -748,10 +809,25 @@ export function computeTooltipLayout(options: {
         bounds
       );
 
-      const overlapsTarget = doesTooltipOverlapTarget(
-        candidate,
-        options.targetRect
+      const targetCenterX =
+        options.targetRect.left +
+        options.targetRect.width / 2;
+      const arrowOffsetX = Math.min(
+        width / 2 - 12,
+        Math.max(
+          -width / 2 + 12,
+          targetCenterX -
+            (candidate.left + width / 2)
+        )
       );
+
+      const overlapsTarget =
+        doesTooltipOrArrowOverlapTarget(
+          candidate,
+          options.targetRect,
+          placement,
+          arrowOffsetX
+        );
       const overlapsFixed = overlapsObstacle(
         candidate,
         obstacles
@@ -763,18 +839,6 @@ export function computeTooltipLayout(options: {
         !collisionDetected &&
         fitsInBounds(candidate, bounds)
       ) {
-        const targetCenterX =
-          options.targetRect.left +
-          options.targetRect.width / 2;
-        const arrowOffsetX = Math.min(
-          width / 2 - 12,
-          Math.max(
-            -width / 2 + 12,
-            targetCenterX -
-              (candidate.left + width / 2)
-          )
-        );
-
         return {
           top: candidate.top,
           left: candidate.left,
