@@ -2,6 +2,7 @@ import {
   findInteractiveTarget,
   isTargetInteractive,
 } from "@/lib/tutorialTarget";
+import { getTutorialCreatedProjectId } from "@/lib/tutorialCreatedProject";
 import { getTargetVisibleRatio } from "@/lib/tutorialPositioning";
 
 type PinnedTarget = {
@@ -24,6 +25,40 @@ export function clearPinnedTourTarget() {
 
 export function getPinnedTourTarget(): PinnedTarget | null {
   return pinnedTarget;
+}
+
+function resolveTutorialProjectCardTarget(): HTMLElement | null {
+  const projectId =
+    getTutorialCreatedProjectId();
+
+  if (!projectId) {
+    return null;
+  }
+
+  const selector = `a[data-tour="project-card"][href="/projects/${projectId}"]`;
+  const element = document.querySelector(
+    selector
+  );
+
+  if (
+    element instanceof HTMLElement &&
+    isTargetInteractive(element)
+  ) {
+    const instanceId = element.getAttribute(
+      "data-tour-instance-id"
+    );
+
+    if (instanceId) {
+      pinTourTarget(
+        '[data-tour="project-card"]',
+        instanceId
+      );
+    }
+
+    return element;
+  }
+
+  return null;
 }
 
 function resolveMonthCalendarDayTarget(): HTMLElement | null {
@@ -53,6 +88,15 @@ function resolveMonthCalendarDayTarget(): HTMLElement | null {
 export function resolveTourTarget(
   selector: string
 ): HTMLElement | null {
+  if (selector === '[data-tour="project-card"]') {
+    const tutorialCard =
+      resolveTutorialProjectCardTarget();
+
+    if (tutorialCard) {
+      return tutorialCard;
+    }
+  }
+
   if (selector === '[data-tour="month-calendar-day"]') {
     const monthDay = resolveMonthCalendarDayTarget();
 

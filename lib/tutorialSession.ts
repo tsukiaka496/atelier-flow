@@ -1,3 +1,5 @@
+import { clearTutorialCreatedProjectId } from "@/lib/tutorialCreatedProject";
+
 export type TutorialSessionStatus =
   | "idle"
   | "modal-open";
@@ -101,4 +103,5 @@ export function endTutorialSession() {
 
   sessionStorage.removeItem(SESSION_FLAG_KEY);
   sessionStorage.removeItem(SESSION_STATE_KEY);
+  clearTutorialCreatedProjectId();
 }

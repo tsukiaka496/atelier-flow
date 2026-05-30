@@ -231,6 +231,20 @@ function rectsNearlyEqual(
   );
 }
 
+function matchesStepAdvanceTourId(
+  step: GuidedStep,
+  tourId: string
+): boolean {
+  if (step.advance.type !== "click") {
+    return false;
+  }
+
+  return (
+    step.advance.tourId === tourId ||
+    step.cta?.tourId === tourId
+  );
+}
+
 function shouldDeferStepCommit(
   current: GuidedStep,
   next: GuidedStep
@@ -797,10 +811,6 @@ export default function OnboardingProvider({
 
   const registerTourAction = useCallback(
     (tourId: string) => {
-      if (isTransitioning) {
-        return;
-      }
-
       if (process.env.NODE_ENV === "development") {
         console.log("[tour action]", tourId);
       }
@@ -832,11 +842,16 @@ export default function OnboardingProvider({
         return;
       }
 
-      if (current.advance.type !== "click") {
+      if (!matchesStepAdvanceTourId(current, tourId)) {
         return;
       }
 
-      if (current.advance.tourId !== tourId) {
+      if (
+        isTransitioning &&
+        current.advance.type === "click" &&
+        current.advance.tourId !== tourId &&
+        current.cta?.tourId !== tourId
+      ) {
         return;
       }
 
@@ -953,8 +968,10 @@ export default function OnboardingProvider({
 
     if (
       !current ||
-      current.advance.type !== "click" ||
-      current.advance.tourId !== pendingActionTourId
+      !matchesStepAdvanceTourId(
+        current,
+        pendingActionTourId
+      )
     ) {
       return;
     }
@@ -986,7 +1003,19 @@ export default function OnboardingProvider({
       tourId: string,
       options?: RunTourActionOptions
     ) => {
-      if (isTransitioning) {
+      const current =
+        GUIDED_STEPS.find(
+          (step) => step.id === currentStepId
+        ) ?? null;
+
+      if (
+        isTransitioning &&
+        (!current ||
+          !matchesStepAdvanceTourId(
+            current,
+            tourId
+          ))
+      ) {
         return;
       }
 
@@ -999,11 +1028,6 @@ export default function OnboardingProvider({
       }
 
       logTutorialTimeline("action executed", tourId);
-
-      const current =
-        GUIDED_STEPS.find(
-          (step) => step.id === currentStepId
-        ) ?? null;
 
       const readyKey = current?.advanceWhenReadyKey;
 

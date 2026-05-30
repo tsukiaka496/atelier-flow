@@ -567,7 +567,14 @@ export default function TutorialOverlay({
   };
 
   const handleCtaClick = () => {
-    if (isTransitioning || !step.cta) {
+    if (!step.cta) {
+      return;
+    }
+
+    const canBypassTransition =
+      step.cta.tourId === "tutorial-advance-next";
+
+    if (isTransitioning && !canBypassTransition) {
       return;
     }
 

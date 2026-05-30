@@ -9,6 +9,7 @@ import {
   Task,
 } from "@/lib/storage";
 import { addProjectRepo } from "@/lib/projectsRepo";
+import { setTutorialCreatedProjectId } from "@/lib/tutorialCreatedProject";
 import { isTutorialSessionActive } from "@/lib/tutorialSession";
 import { createTutorialProjectDraft } from "@/lib/tutorialProjectDraft";
 
@@ -38,7 +39,12 @@ import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const { bumpTutorialReady } = useOnboarding();
+  const {
+    bumpTutorialReady,
+    currentStepId,
+    isTutorialActive,
+    runTourAction,
+  } = useOnboarding();
 
   const fillExampleInstance = useTourInstanceId(
     "tutorial-fill-example"
@@ -134,11 +140,30 @@ export default function NewProjectPage() {
   }, [applyTutorialExample, exampleApplied]);
 
   useEffect(() => {
+    if (
+      !isTutorialActive ||
+      currentStepId !== "project-new-create" ||
+      exampleApplied
+    ) {
+      return;
+    }
+
+    applyTutorialExample();
+  }, [
+    applyTutorialExample,
+    currentStepId,
+    exampleApplied,
+    isTutorialActive,
+  ]);
+
+  useEffect(() => {
     return registerTutorialReadyCheck(
       "project-form-filled",
-      () => exampleApplied
+      () =>
+        exampleApplied ||
+        Boolean(client.trim() && title.trim())
     );
-  }, [exampleApplied]);
+  }, [client, exampleApplied, title]);
 
   useEffect(() => {
     bumpTutorialReady();
@@ -253,27 +278,46 @@ export default function NewProjectPage() {
     setTasks(copied);
   }
 
-  function createProject() {
-    const tutorialFlag =
-      isTutorialSessionActive() && exampleApplied;
+  const handleCreateProject = useCallback(() => {
+    const projectId = crypto.randomUUID();
+    const inTutorial =
+      isTutorialSessionActive();
 
     addProjectRepo({
-      id: crypto.randomUUID(),
+      id: projectId,
       client: client.trim(),
       title: title.trim(),
       deadline,
       color: normalizeProjectColor(color),
       tasks,
-      isTutorial: tutorialFlag ? true : undefined,
+      isTutorial: inTutorial ? true : undefined,
     });
 
-    router.push("/projects");
-  }
+    if (inTutorial) {
+      setTutorialCreatedProjectId(projectId);
+    }
 
-  const handleCreateProject = useTourAction(
-    "create-project",
-    createProject
-  );
+    router.push("/projects");
+
+    if (
+      inTutorial &&
+      currentStepId === "project-new-create"
+    ) {
+      requestAnimationFrame(() => {
+        runTourAction("create-project", {
+          skipExecute: true,
+        });
+      });
+    }
+  }, [
+    client,
+    color,
+    currentStepId,
+    deadline,
+    runTourAction,
+    tasks,
+    title,
+  ]);
 
   return (
     <ThemedMain className="px-5 py-8 pb-32">

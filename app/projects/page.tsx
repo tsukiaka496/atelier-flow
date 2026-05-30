@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import type { Project } from "@/lib/storage";
 import { useProjectsRepo } from "@/lib/useProjectsRepo";
@@ -19,6 +19,9 @@ import {
 import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
 import HintLabel from "@/components/onboarding/HintLabel";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
+import { registerTutorialReadyCheck } from "@/lib/tutorialActionRegistry";
+import { getTutorialCreatedProjectId } from "@/lib/tutorialCreatedProject";
 
 type SortType = "deadline" | "progress";
 
@@ -72,6 +75,8 @@ function getShowCompletedSnapshot(): boolean {
 }
 
 export default function ProjectsPage() {
+  const { bumpTutorialReady } = useOnboarding();
+
   const triggerProjectsAdd =
     useTourAction("projects-add");
   const triggerProjectCard =
@@ -162,10 +167,45 @@ export default function ProjectsPage() {
     return 0;
   });
 
+  const createdTutorialId =
+    getTutorialCreatedProjectId();
+
   const tourProjectId =
+    (createdTutorialId &&
+      projects.some(
+        (project) =>
+          project.id === createdTutorialId
+      ) &&
+      createdTutorialId) ||
     projects.find(
       (project) => project.isTutorial
-    )?.id ?? sortedProjects[0]?.id;
+    )?.id ||
+    sortedProjects[0]?.id;
+
+  useEffect(() => {
+    return registerTutorialReadyCheck(
+      "tutorial-project-card-ready",
+      () => {
+        const targetId =
+          getTutorialCreatedProjectId() ||
+          projects.find(
+            (project) => project.isTutorial
+          )?.id;
+
+        if (!targetId) {
+          return false;
+        }
+
+        return projects.some(
+          (project) => project.id === targetId
+        );
+      }
+    );
+  }, [projects]);
+
+  useEffect(() => {
+    bumpTutorialReady();
+  }, [projects, tourProjectId, bumpTutorialReady]);
 
   return (
     <ThemedMain className="px-5 py-8 pb-32">
