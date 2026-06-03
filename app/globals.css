@@ -38,7 +38,8 @@ html.tutorial-active {
 [data-tour="create-project"],
 [data-tour="month-template-add"],
 [data-tour="home-date-picker"],
-[data-tour="week-calendar"] {
+[data-tour="week-calendar"],
+[data-tour="project-schedule-reschedule-panel"] {
   scroll-margin-top: 96px;
   scroll-margin-bottom: 32px;
 }
@@ -87,11 +88,46 @@ html.tutorial-active {
   }
 }
 
-.tutorial-tooltip-panel {
+.tutorial-overlay-stable {
+  opacity: 1;
+}
+
+.tutorial-spotlight-ring,
+.tutorial-spotlight-panel {
   transition:
-    top 0.18s ease,
-    left 0.18s ease,
-    width 0.18s ease;
+    top 0.32s ease,
+    left 0.32s ease,
+    width 0.32s ease,
+    height 0.32s ease,
+    opacity 0.2s ease;
+}
+
+.tutorial-tooltip-panel,
+.tutorial-tooltip-panel-compact {
+  transition:
+    top 0.32s ease,
+    left 0.32s ease,
+    width 0.32s ease,
+    opacity 0.22s ease;
+}
+
+.tutorial-tooltip-settling {
+  opacity: 0.94;
+}
+
+.tutorial-tooltip-content {
+  animation: tutorial-tooltip-content-in 0.24s ease-out;
+}
+
+@keyframes tutorial-tooltip-content-in {
+  from {
+    opacity: 0.94;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tutorial-overlay-root {
@@ -167,6 +203,15 @@ html.tutorial-active {
     animation: none;
     opacity: 0;
     max-height: 0;
+  }
+
+  .tutorial-spotlight-ring,
+  .tutorial-spotlight-panel,
+  .tutorial-tooltip-panel,
+  .tutorial-tooltip-panel-compact,
+  .tutorial-tooltip-content {
+    animation: none;
+    transition: none;
   }
 
   .tutorial-mask-nudge {

@@ -74,7 +74,7 @@ export default function WelcomeOverlay({
         </h2>
 
         <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-          短いステップで、ホーム・月・案件・メモ・設定の流れを確認します。
+          短いステップで、月・案件（日程の組み直し）・メモ・ホーム・設定を確認します。
         </p>
 
         <div className="mt-3 flex flex-wrap gap-1.5">

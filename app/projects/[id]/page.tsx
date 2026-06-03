@@ -31,11 +31,20 @@ import {
   getProjectProgress,
   isProjectFullyCompleted,
 } from "@/lib/projectProgress";
+import ProjectScheduleReschedule from "@/components/ProjectScheduleReschedule";
+import {
+  formatLocalDate,
+  formatPlanDateLabel,
+} from "@/lib/taskPlan";
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const { setTutorialModalOpen } = useOnboarding();
-  const triggerTaskToggle = useTourAction("project-task-toggle");
+  const {
+    setTutorialModalOpen,
+    isTutorialActive,
+    currentStepId,
+    registerTourAction,
+  } = useOnboarding();
   const triggerTaskEdit = useTourAction("project-task-edit");
   const triggerTaskSave = useTourAction("project-task-save");
 
@@ -77,6 +86,21 @@ export default function ProjectDetailPage() {
   }
 
   const currentProject = project;
+  const todayString = formatLocalDate(
+    new Date()
+  );
+
+  function applyRescheduledProject(
+    updatedProject: Project
+  ) {
+    saveProjectsRepo(
+      projects.map((item) =>
+        item.id === updatedProject.id
+          ? updatedProject
+          : item
+      )
+    );
+  }
 
   function getProgress() {
     return getProjectProgress(currentProject);
@@ -535,6 +559,11 @@ export default function ProjectDetailPage() {
 
           </div>
 
+          <ProjectScheduleReschedule
+            project={currentProject}
+            onApply={applyRescheduledProject}
+          />
+
           <div className="space-y-3">
 
             {currentProject.tasks.map(
@@ -554,8 +583,14 @@ export default function ProjectDetailPage() {
                     tabIndex={0}
                     onClick={() => {
                       toggleTask(task.id);
-                      if (index === 0) {
-                        triggerTaskToggle();
+                      if (
+                        index === 0 &&
+                        isTutorialActive &&
+                        currentStepId === "task-toggle"
+                      ) {
+                        registerTourAction(
+                          "project-task-toggle"
+                        );
                       }
                     }}
                     onKeyDown={(event) => {
@@ -565,8 +600,14 @@ export default function ProjectDetailPage() {
                       ) {
                         event.preventDefault();
                         toggleTask(task.id);
-                        if (index === 0) {
-                          triggerTaskToggle();
+                        if (
+                          index === 0 &&
+                          isTutorialActive &&
+                          currentStepId === "task-toggle"
+                        ) {
+                          registerTourAction(
+                            "project-task-toggle"
+                          );
                         }
                       }
                     }}
@@ -612,18 +653,17 @@ export default function ProjectDetailPage() {
                           {task.title}
                         </p>
 
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
 
                           <p className="text-xs text-zinc-400 dark:text-zinc-500">
-
-                            {task.date
-                              ? task.date
-                              : "日付なし"}
-
+                            やる予定:{" "}
+                            {formatPlanDateLabel(
+                              task.date,
+                              todayString
+                            )}
                           </p>
 
                           {task.date && (
-
                             <div
                               className="
                                 rounded-full
@@ -631,16 +671,18 @@ export default function ProjectDetailPage() {
                                 px-2
                                 py-1
                                 text-[10px]
-                                text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
+                                text-zinc-500
+                                dark:bg-zinc-800
+                                dark:text-zinc-400
                               "
                             >
-
                               {taskDaysLeft === 0
                                 ? "今日"
-                                : `あと${taskDaysLeft}日`}
-
+                                : taskDaysLeft !== null &&
+                                    taskDaysLeft < 0
+                                  ? "予定を過ぎています"
+                                  : `あと${taskDaysLeft}日`}
                             </div>
-
                           )}
 
                         </div>

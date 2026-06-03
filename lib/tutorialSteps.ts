@@ -32,10 +32,10 @@ export type GuidedStep = {
 };
 
 export const TUTORIAL_TAB_ORDER: TutorialTabId[] = [
-  "home",
   "month",
   "tasks",
   "memo",
+  "home",
   "settings",
 ];
 
@@ -55,10 +55,9 @@ const HOME_STEPS: GuidedStep[] = [
     id: "home-intro",
     tab: "home",
     route: "/",
-    routeScope: "any-nav",
     target: '[data-tour="week-calendar"]',
     title: "ホーム",
-    body: "週で日を選ぶと、その日の作業・メモ・仕事が表示されます。",
+    body: "週で日を選ぶと、この日の作業・メモ・仕事がまとまって見えます。",
     placement: "top",
     advance: {
       type: "click",
@@ -73,7 +72,6 @@ const HOME_STEPS: GuidedStep[] = [
     id: "home-date",
     tab: "home",
     route: "/",
-    routeScope: "any-nav",
     target: '[data-tour="home-date-picker"]',
     title: "日付ジャンプ",
     body: "右上の日付をタップすることで、好きな日に飛ぶことができます。",
@@ -165,7 +163,7 @@ const TASKS_STEPS: GuidedStep[] = [
     route: "/projects",
     target: '[data-tour="projects-add"]',
     title: "案件を追加",
-    body: "「＋」から新しい依頼を作れます。",
+    body: "「＋」から依頼を追加します。",
     placement: "bottom",
     advance: { type: "click", tourId: "projects-add" },
   },
@@ -175,7 +173,7 @@ const TASKS_STEPS: GuidedStep[] = [
     route: "/projects/new",
     target: '[data-tour="create-project"]',
     title: "作成する",
-    body: "サンプル入力後、「依頼作成」を押してください。",
+    body: "サンプルには作業と予定日が入っています。「依頼作成」を押してください。",
     placement: "top",
     advance: {
       type: "click",
@@ -200,12 +198,33 @@ const TASKS_STEPS: GuidedStep[] = [
     route: "/projects/:id",
     target: '[data-tour="project-task-toggle"]',
     title: "作業を完了",
-    body: "タップで完了。「全完了」で一括操作もできます。",
+    body: "タップで完了にできます。",
     placement: "bottom",
     advance: {
       type: "click",
       tourId: "project-task-toggle",
     },
+  },
+  {
+    id: "project-reschedule",
+    tab: "tasks",
+    route: "/projects/:id",
+    target:
+      '[data-tour="project-schedule-reschedule-panel"]',
+    title: "日程を組み直す",
+    body: "①外す日（空けたい・過ぎた日）②足す日（まだ使っていない日）。未完了だけ動き、同日の作業はまとまったままです。",
+    placement: "top",
+    advance: {
+      type: "click",
+      tourId: "tutorial-advance-next",
+    },
+    cta: {
+      label: "次へ",
+      tourId: "tutorial-advance-next",
+    },
+    afterEnterKey: "tutorial-reschedule-open",
+    enterWhenReadyKey:
+      "project-schedule-reschedule-open",
   },
 ];
 
@@ -226,9 +245,9 @@ const MEMO_STEPS: GuidedStep[] = [
     tab: "memo",
     route: "/memos",
     routeExact: true,
-    target: '[data-tour="memo-quick-add"]',
+    target: '[data-tour="memo-quick-compose"]',
     title: "メモを追加",
-    body: "内容を書いて「追加」。ホームでは日付ごとに表示されます。",
+    body: "内容を書いて追加。ホームでは日付ごとに表示されます。",
     placement: "auto",
     advance: {
       type: "click",
@@ -256,7 +275,7 @@ const SETTINGS_STEPS: GuidedStep[] = [
     route: "/settings",
     target: '[data-tour="settings-guide"]',
     title: "準備完了",
-    body: "基本の流れは以上です。あとは自由に使ってみてください。",
+    body: "月・案件（日程の組み直し）・メモ・ホームの流れは以上です。あとは自由に使ってみてください。",
     placement: "bottom",
     advance: { type: "manual" },
   },

@@ -22,7 +22,7 @@ export default function TaskScheduleDateInput({
   return (
     <div className="min-w-0">
       <p className={`mb-2 text-xs ${appSurfaces.subtleText}`}>
-        いつやる日（任意）
+        やる予定日（任意・案件の並びは変わりません）
       </p>
 
       <label
@@ -61,7 +61,7 @@ export default function TaskScheduleDateInput({
           }}
           className="accent-[var(--theme-accent)]"
         />
-        日付なし
+        予定なし（あとから載せる）
       </label>
 
       {hasDate && (

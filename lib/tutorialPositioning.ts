@@ -627,6 +627,23 @@ export function isTargetActionable(
   return ratio >= 0.35;
 }
 
+const MIN_SPOTLIGHT_SIZE = 8;
+
+export function isValidSpotlightRect(
+  rect: BoxRect | null | undefined
+): boolean {
+  if (!rect) {
+    return false;
+  }
+
+  return (
+    rect.width >= MIN_SPOTLIGHT_SIZE &&
+    rect.height >= MIN_SPOTLIGHT_SIZE &&
+    Number.isFinite(rect.top) &&
+    Number.isFinite(rect.left)
+  );
+}
+
 export function getSpotlightPadding(
   element: HTMLElement
 ): number {
@@ -646,9 +663,21 @@ export function getSpotlightPadding(
 
 export function measureSpotlightRect(
   element: HTMLElement
-): BoxRect {
-  const padding = getSpotlightPadding(element);
+): BoxRect | null {
+  if (!element.isConnected) {
+    return null;
+  }
+
   const box = element.getBoundingClientRect();
+
+  if (
+    box.width < MIN_SPOTLIGHT_SIZE ||
+    box.height < MIN_SPOTLIGHT_SIZE
+  ) {
+    return null;
+  }
+
+  const padding = getSpotlightPadding(element);
 
   return {
     top: box.top - padding,

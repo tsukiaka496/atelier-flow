@@ -14,6 +14,7 @@ import { tutorialTheme } from "@/lib/tutorialTheme";
 import type { GuidedStep } from "@/lib/tutorialSteps";
 import {
   computeTooltipLayout,
+  isValidSpotlightRect,
   prefersReducedMotion,
   type TooltipLayoutResult,
 } from "@/lib/tutorialPositioning";
@@ -100,7 +101,7 @@ const SpotlightMask = memo(function SpotlightMask({
       {panels.map((panel, index) => (
         <div
           key={index}
-          className={`${tutorialTheme.maskPanel} tutorial-mask-surface${nudgeClass}`}
+          className={`${tutorialTheme.maskPanel} tutorial-mask-surface tutorial-spotlight-panel${nudgeClass}`}
           style={{
             top: panel.top,
             left: panel.left,
@@ -114,7 +115,7 @@ const SpotlightMask = memo(function SpotlightMask({
       ))}
 
       <div
-        className={`${tutorialTheme.maskRing} tutorial-mask-surface`}
+        className={`${tutorialTheme.maskRing} tutorial-mask-surface tutorial-spotlight-ring`}
         style={{
           top: safe.top,
           left: safe.left,
@@ -353,9 +354,14 @@ const TooltipPanel = memo(function TooltipPanel({
     }
   }, [isLastStep, isTransitioning, step.cta, targetMissing]);
 
+  const settlingClass =
+    isTransitioning && !prefersReducedMotion()
+      ? " tutorial-tooltip-settling"
+      : "";
+
   return (
     <div
-      className={`${panelClass}${nudgeClass}`}
+      className={`${panelClass}${nudgeClass}${settlingClass}`}
       style={{
         top: layout.top,
         left: layout.left,
@@ -397,7 +403,10 @@ const TooltipPanel = memo(function TooltipPanel({
           </div>
         </>
       ) : (
-        <>
+        <div
+          key={step.id}
+          className="tutorial-tooltip-content"
+        >
           <p id={titleId} className={titleClass}>
             {step.title}
           </p>
@@ -495,7 +504,7 @@ const TooltipPanel = memo(function TooltipPanel({
               </p>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -532,7 +541,9 @@ export default function TutorialOverlay({
   );
 
   const showSpotlight =
-    Boolean(targetRect) && !targetMissing;
+    Boolean(targetRect) &&
+    isValidSpotlightRect(targetRect) &&
+    !targetMissing;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -588,8 +599,8 @@ export default function TutorialOverlay({
 
   const rootClass = [
     "tutorial-overlay-root",
+    "tutorial-overlay-stable",
     isCompleting ? "tutorial-overlay-completing" : "",
-    prefersReducedMotion() ? "" : "tutorial-overlay-enter",
   ]
     .filter(Boolean)
     .join(" ");
@@ -604,11 +615,9 @@ export default function TutorialOverlay({
         />
       ) : (
         <div
-          className={`${tutorialTheme.maskPanel} tutorial-mask-surface fixed inset-0${
-            nudge && !prefersReducedMotion()
-              ? " tutorial-mask-nudge"
-              : ""
-          }${isCompleting ? " tutorial-backdrop-complete" : ""}`}
+          className={`${tutorialTheme.maskPanel} tutorial-mask-surface tutorial-backdrop-dim fixed inset-0${
+            isCompleting ? " tutorial-backdrop-complete" : ""
+          }`}
           style={{ zIndex: OVERLAY_Z }}
           aria-hidden={!targetMissing}
           onClick={handleBlockedClick}

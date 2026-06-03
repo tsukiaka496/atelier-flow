@@ -34,7 +34,7 @@ export default function HintLabel({
   return (
     <div>
       {children}
-      <p className="mt-1 text-center text-[11px] text-zinc-400">
+      <p className="mt-1 text-center text-[10px] leading-snug text-zinc-400 dark:text-zinc-500">
         {text}
       </p>
     </div>

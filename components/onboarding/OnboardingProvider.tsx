@@ -124,6 +124,7 @@ import {
 import {
   getTargetVisibleRatio,
   isTargetActionable,
+  isValidSpotlightRect,
   measureSpotlightRect,
   prefersReducedMotion,
   scrollTourTargetIntoView,
@@ -135,7 +136,6 @@ import WelcomeOverlay from "@/components/onboarding/WelcomeOverlay";
 import {
   getProjectsRepo,
   notifyProjectsChanged,
-  subscribeProjectsChanged,
 } from "@/lib/projectsRepo";
 
 type TargetRect = {
@@ -185,6 +185,8 @@ const TARGET_MISSING_MS = 3000;
 const MEASURE_DEBOUNCE_MS = 48;
 const ACTION_DEDUPE_MS = 300;
 const COMPLETE_FADE_MS = 600;
+/** 次ステップへ進む前の短い間（画面は暗転させない） */
+const STEP_PAUSE_MS = 140;
 
 const NAV_TOUR_IDS = new Set([
   "nav-home",
@@ -215,7 +217,7 @@ export function useOnboarding() {
 
 function measureElementRect(
   element: HTMLElement
-): TargetRect {
+): TargetRect | null {
   return measureSpotlightRect(element);
 }
 
@@ -245,27 +247,6 @@ function matchesStepAdvanceTourId(
   );
 }
 
-function shouldDeferStepCommit(
-  current: GuidedStep,
-  next: GuidedStep
-): boolean {
-  if (
-    current.advanceWhenReadyKey &&
-    !isTutorialReady(current.advanceWhenReadyKey)
-  ) {
-    return true;
-  }
-
-  if (
-    next.enterWhenReadyKey &&
-    !isTutorialReady(next.enterWhenReadyKey)
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 export default function OnboardingProvider({
   children,
 }: {
@@ -284,6 +265,9 @@ export default function OnboardingProvider({
   } | null>(null);
   const sessionHydratedRef = useRef(false);
   const completeTimeoutRef = useRef<number | null>(
+    null
+  );
+  const stepAdvanceTimeoutRef = useRef<number | null>(
     null
   );
 
@@ -323,14 +307,14 @@ export default function OnboardingProvider({
   const [isCompleting, setIsCompleting] =
     useState(false);
 
+  const [heldTargetRect, setHeldTargetRect] =
+    useState<TargetRect | null>(null);
+
   const [fadeStep, setFadeStep] =
     useState<GuidedStep | null>(null);
 
   const [tutorialModalOpen, setTutorialModalOpenState] =
     useState(false);
-
-  const [projectsCount, setProjectsCount] =
-    useState(() => getProjectsRepo().length);
 
   useEffect(() => {
     currentStepIdRef.current = currentStepId;
@@ -353,17 +337,38 @@ export default function OnboardingProvider({
   }, []);
 
   const applyTargetRect = useCallback(
-    (next: TargetRect) => {
+    (next: TargetRect | null) => {
+      if (next && !isValidSpotlightRect(next)) {
+        return;
+      }
+
       setTargetRect((prev) => {
+        if (!next) {
+          return prev;
+        }
+
         if (prev && rectsNearlyEqual(prev, next)) {
           return prev;
         }
 
+        setHeldTargetRect(next);
         return next;
       });
     },
     []
   );
+
+  const displayedTargetRect = useMemo(() => {
+    if (isValidSpotlightRect(targetRect)) {
+      return targetRect;
+    }
+
+    if (isValidSpotlightRect(heldTargetRect)) {
+      return heldTargetRect;
+    }
+
+    return null;
+  }, [heldTargetRect, targetRect]);
 
   const persistSession = useCallback(() => {
     if (!isTutorialSessionActive()) {
@@ -383,7 +388,17 @@ export default function OnboardingProvider({
     });
   }, [pathname, pendingStepId, tutorialStatus]);
 
+  const clearStepAdvanceTimeout = useCallback(() => {
+    if (stepAdvanceTimeoutRef.current) {
+      window.clearTimeout(
+        stepAdvanceTimeoutRef.current
+      );
+      stepAdvanceTimeoutRef.current = null;
+    }
+  }, []);
+
   const resetTutorialRuntime = useCallback(() => {
+    clearStepAdvanceTimeout();
     runMeasureCleanup();
     clearPinnedTourTarget();
     setCurrentStepId(null);
@@ -394,16 +409,11 @@ export default function OnboardingProvider({
     setTargetVisibleRatio(1);
     setTutorialModalOpenState(false);
     setIsTransitioning(false);
+    setHeldTargetRect(null);
     document.documentElement.classList.remove(
       "tutorial-active"
     );
-  }, [runMeasureCleanup]);
-
-  useEffect(() => {
-    return subscribeProjectsChanged(() => {
-      setProjectsCount(getProjectsRepo().length);
-    });
-  }, []);
+  }, [clearStepAdvanceTimeout, runMeasureCleanup]);
 
   useEffect(() => {
     return registerTutorialReadyCheck(
@@ -622,6 +632,8 @@ export default function OnboardingProvider({
       return;
     }
 
+    clearStepAdvanceTimeout();
+
     const step =
       GUIDED_STEPS.find(
         (item) =>
@@ -644,9 +656,11 @@ export default function OnboardingProvider({
       completeTimeoutRef.current = null;
       finalizeComplete();
     }, delay);
-  }, [finalizeComplete, isCompleting]);
+  }, [clearStepAdvanceTimeout, finalizeComplete, isCompleting]);
 
   const skipWelcome = useCallback(() => {
+    clearStepAdvanceTimeout();
+
     if (completeTimeoutRef.current) {
       window.clearTimeout(completeTimeoutRef.current);
       completeTimeoutRef.current = null;
@@ -663,11 +677,14 @@ export default function OnboardingProvider({
     refreshOnboarding();
     resetTutorialRuntime();
     logTutorialTimeline("welcome skip");
-  }, [refreshOnboarding, resetTutorialRuntime]);
+  }, [
+    clearStepAdvanceTimeout,
+    refreshOnboarding,
+    resetTutorialRuntime,
+  ]);
 
   const isTutorialActive =
-    !settings.tutorialCompleted &&
-    settings.hintMode !== "off";
+    !settings.tutorialCompleted;
 
   const activeStep = useMemo((): GuidedStep | null => {
     if (
@@ -726,29 +743,35 @@ export default function OnboardingProvider({
   }, [activeStep, pendingStepId]);
 
   const shouldShowHints = useMemo(() => {
-    if (settings.hintMode === "off") {
+    if (settings.hintMode !== "on") {
       return false;
     }
 
-    if (settings.hintMode === "always") {
-      return true;
-    }
-
-    if (isTutorialSessionActive()) {
-      return false;
-    }
-
-    return (
-      !settings.tutorialCompleted &&
-      projectsCount === 0
-    );
-  }, [projectsCount, settings]);
+    return !isTutorialSessionActive();
+  }, [settings.hintMode]);
 
   const shouldShowWelcome =
     isTutorialActive &&
-    !settings.tutorialCompleted &&
-    settings.hintMode !== "off" &&
     !isTutorialSessionActive();
+
+  const scheduleStepAdvance = useCallback(
+    (advance: () => void) => {
+      clearStepAdvanceTimeout();
+      setIsTransitioning(true);
+      logTutorialTimeline("step pause");
+
+      const delay = prefersReducedMotion()
+        ? 0
+        : STEP_PAUSE_MS;
+
+      stepAdvanceTimeoutRef.current =
+        window.setTimeout(() => {
+          stepAdvanceTimeoutRef.current = null;
+          advance();
+        }, delay);
+    },
+    [clearStepAdvanceTimeout]
+  );
 
   const transitionToStep = useCallback(
     (stepId: string) => {
@@ -765,7 +788,6 @@ export default function OnboardingProvider({
 
       setIsTransitioning(true);
       clearPinnedTourTarget();
-      setTargetRect(null);
       setTargetMissing(false);
       logTutorialTimeline("step enter", stepId);
 
@@ -819,6 +841,7 @@ export default function OnboardingProvider({
       next.enterWhenReadyKey &&
       !isTutorialReady(next.enterWhenReadyKey)
     ) {
+      runTutorialHook(next.afterEnterKey);
       return;
     }
 
@@ -888,6 +911,10 @@ export default function OnboardingProvider({
         return;
       }
 
+      if (isTransitioning) {
+        return;
+      }
+
       if (
         tutorialModalOpen &&
         NAV_TOUR_IDS.has(tourId)
@@ -904,15 +931,6 @@ export default function OnboardingProvider({
       }
 
       if (!matchesStepAdvanceTourId(current, tourId)) {
-        return;
-      }
-
-      if (
-        isTransitioning &&
-        current.advance.type === "click" &&
-        current.advance.tourId !== tourId &&
-        current.cta?.tourId !== tourId
-      ) {
         return;
       }
 
@@ -933,7 +951,9 @@ export default function OnboardingProvider({
           refreshOnboarding();
         }
 
-        completeTutorial();
+        scheduleStepAdvance(() => {
+          completeTutorial();
+        });
         return;
       }
 
@@ -970,38 +990,36 @@ export default function OnboardingProvider({
           );
       }
 
-      if (navigateTarget) {
-        setIsTransitioning(true);
-        setPendingStepId(next.id);
-        router.push(navigateTarget);
-        return;
-      }
-
-      if (matchesGuidedStepRoute(next, pathname)) {
-        if (shouldDeferStepCommit(current, next)) {
+      const performAdvance = () => {
+        if (navigateTarget) {
+          setIsTransitioning(true);
           setPendingStepId(next.id);
-          bumpTutorialReady();
+          router.push(navigateTarget);
           return;
         }
 
-        transitionToStep(next.id);
-        return;
-      }
+        if (matchesGuidedStepRoute(next, pathname)) {
+          transitionToStep(next.id);
+          return;
+        }
 
-      const fallbackNav =
-        resolveTutorialNavigation(
-          next,
-          pathname
-        );
+        const fallbackNav =
+          resolveTutorialNavigation(
+            next,
+            pathname
+          );
 
-      if (fallbackNav) {
-        setIsTransitioning(true);
+        if (fallbackNav) {
+          setIsTransitioning(true);
+          setPendingStepId(next.id);
+          router.push(fallbackNav);
+          return;
+        }
+
         setPendingStepId(next.id);
-        router.push(fallbackNav);
-        return;
-      }
+      };
 
-      setPendingStepId(next.id);
+      scheduleStepAdvance(performAdvance);
     },
     [
       bumpTutorialReady,
@@ -1012,6 +1030,7 @@ export default function OnboardingProvider({
       pathname,
       refreshOnboarding,
       router,
+      scheduleStepAdvance,
       transitionToStep,
       tutorialModalOpen,
     ]
@@ -1069,14 +1088,7 @@ export default function OnboardingProvider({
           (step) => step.id === currentStepId
         ) ?? null;
 
-      if (
-        isTransitioning &&
-        (!current ||
-          !matchesStepAdvanceTourId(
-            current,
-            tourId
-          ))
-      ) {
+      if (isTransitioning) {
         return;
       }
 
@@ -1194,19 +1206,26 @@ export default function OnboardingProvider({
                 : ratio
             );
 
-            applyTargetRect(
-              measureElementRect(element)
-            );
-            setIsTransitioning(false);
-            logTutorialTimeline(
-              "target resolved",
-              activeStep.target
-            );
-            logTutorialTimeline("position computed");
+            const rect =
+              measureElementRect(element);
+
+            if (rect) {
+              applyTargetRect(rect);
+              setIsTransitioning(false);
+              logTutorialTimeline(
+                "target resolved",
+                activeStep.target
+              );
+              logTutorialTimeline("position computed");
+            } else if (retryCount >= 8) {
+              setIsTransitioning(false);
+              setTargetMissing(true);
+            }
 
             if (
               retryCount < 8 &&
-              !isTargetActionable(element)
+              (!rect ||
+                !isTargetActionable(element))
             ) {
               scheduleMeasurement(
                 element,
@@ -1281,7 +1300,15 @@ export default function OnboardingProvider({
 
         if (typeof ResizeObserver !== "undefined") {
           observer = new ResizeObserver(() => {
-            updateRect(element, false);
+            const current = resolveTourTarget(
+              activeStep.target
+            );
+
+            if (!current) {
+              return;
+            }
+
+            updateRect(current, false);
           });
           observer.observe(element);
         }
@@ -1513,19 +1540,22 @@ export default function OnboardingProvider({
       pathname
     );
 
-    if (navigateTarget) {
-      setIsTransitioning(true);
-      setPendingStepId(nextStepId);
-      router.push(navigateTarget);
-      requestAnimationFrame(() => {
-        bumpTutorialReady();
-      });
-    } else {
+    scheduleStepAdvance(() => {
+      if (navigateTarget) {
+        setIsTransitioning(true);
+        setPendingStepId(nextStepId);
+        router.push(navigateTarget);
+        requestAnimationFrame(() => {
+          bumpTutorialReady();
+        });
+        return;
+      }
+
       requestAnimationFrame(() => {
         transitionToStep(nextStepId);
         bumpTutorialReady();
       });
-    }
+    });
 
     logTutorialTimeline("tab skipped", tab);
   }, [
@@ -1534,6 +1564,7 @@ export default function OnboardingProvider({
     refreshOnboarding,
     router,
     runMeasureCleanup,
+    scheduleStepAdvance,
     transitionToStep,
     bumpTutorialReady,
   ]);
@@ -1594,7 +1625,9 @@ export default function OnboardingProvider({
       }
 
       const targetTab =
-        explicitTab ?? incompleteTab ?? "home";
+        explicitTab ??
+        incompleteTab ??
+        TUTORIAL_TAB_ORDER[0];
 
       const firstStepId =
         getStartStepForTab(targetTab);
@@ -1626,7 +1659,7 @@ export default function OnboardingProvider({
       if (
         pathname !== "/" &&
         !tab &&
-        (targetTab === "home" || targetTab === "tasks")
+        firstStep?.routeScope === "any-nav"
       ) {
         router.push("/");
       }
@@ -1735,9 +1768,7 @@ export default function OnboardingProvider({
       {overlayStep && (
         <TutorialOverlay
           step={overlayStep}
-          targetRect={
-            isTransitioning ? null : targetRect
-          }
+          targetRect={displayedTargetRect}
           targetMissing={targetMissing}
           targetVisibleRatio={targetVisibleRatio}
           isTransitioning={isTransitioning}

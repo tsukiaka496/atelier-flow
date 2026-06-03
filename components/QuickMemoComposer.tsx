@@ -24,6 +24,7 @@ import {
 } from "@/lib/memoImportance";
 import { theme } from "@/lib/themeClasses";
 
+import HintLabel from "@/components/onboarding/HintLabel";
 import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 
 type QuickMemoComposerProps = {
@@ -138,6 +139,7 @@ export default function QuickMemoComposer({
     importance >= MEMO_IMPORTANCE_HIGH;
 
   return (
+    <HintLabel hintId="memo-quick-add">
     <div
       data-tour="memo-quick-compose"
       className={`mb-4 px-3 py-3 ${appSurfaces.cardSm}`}
@@ -331,5 +333,6 @@ export default function QuickMemoComposer({
         </div>
       </div>
     </div>
+    </HintLabel>
   );
 }

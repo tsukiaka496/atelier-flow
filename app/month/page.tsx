@@ -655,6 +655,7 @@ export default function MonthPage() {
         </HintLabel>
 
         {/* テンプレ */}
+        <HintLabel hintId="month-template-add">
         <div
           className={`mb-5 p-4 ${appSurfaces.cardSm}`}
         >
@@ -913,6 +914,7 @@ export default function MonthPage() {
           )}
 
         </div>
+        </HintLabel>
 
       </div>
 
@@ -931,7 +933,8 @@ export default function MonthPage() {
           -translate-x-1/2
         "
       >
-        <div className="pointer-events-auto flex justify-end">
+        <div className="pointer-events-auto flex flex-col items-end">
+          <HintLabel hintId="month-edit">
           <button
             type="button"
             {...tourInstanceProps(
@@ -963,6 +966,7 @@ export default function MonthPage() {
           >
             {editMode ? "編集ON" : "編集する"}
           </button>
+          </HintLabel>
         </div>
       </div>
 

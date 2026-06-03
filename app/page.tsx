@@ -33,6 +33,11 @@ import {
   getShiftKindLabel,
 } from "@/lib/shiftDisplay";
 import { getTemplatesForDate } from "@/lib/shiftUtils";
+import HomeWorkPlanSections from "@/components/HomeWorkPlanSections";
+import {
+  isTaskOverdue,
+  isTaskUnscheduled,
+} from "@/lib/taskPlan";
 
 function getWeekDates(offset = 0) {
   const now = new Date();
@@ -203,6 +208,21 @@ export default function Home() {
       (task) =>
         task.date === activeDate
     );
+
+  const overdueTasks = useMemo(
+    () =>
+      isViewingToday
+        ? tasks.filter((task) =>
+            isTaskOverdue(task, todayString)
+          )
+        : [],
+    [isViewingToday, tasks, todayString]
+  );
+
+  const backlogTasks = useMemo(
+    () => tasks.filter((task) => isTaskUnscheduled(task)),
+    [tasks]
+  );
 
   const activeDayShifts =
     getTemplatesForDate(
@@ -486,29 +506,31 @@ export default function Home() {
 
           </div>
 
-          <SimpleDatePicker
-            open={calendarOpen}
-            onClose={() =>
-              setCalendarOpen(false)
-            }
-            selectedDate={activeDate}
-            onSelectDate={goToDate}
-          >
-            <button
-              type="button"
-              data-tour="home-date-picker"
-              onClick={handleDatePickerClick}
-              className={`
-                ${appSurfaces.glassBadge}
-                transition-all
-                hover:scale-[1.02]
-                active:scale-[0.98]
-              `}
+          <HintLabel hintId="home-date">
+            <SimpleDatePicker
+              open={calendarOpen}
+              onClose={() =>
+                setCalendarOpen(false)
+              }
+              selectedDate={activeDate}
+              onSelectDate={goToDate}
             >
-              {new Date(activeDate).getMonth() + 1}/
-              {new Date(activeDate).getDate()}
-            </button>
-          </SimpleDatePicker>
+              <button
+                type="button"
+                data-tour="home-date-picker"
+                onClick={handleDatePickerClick}
+                className={`
+                  ${appSurfaces.glassBadge}
+                  transition-all
+                  hover:scale-[1.02]
+                  active:scale-[0.98]
+                `}
+              >
+                {new Date(activeDate).getMonth() + 1}/
+                {new Date(activeDate).getDate()}
+              </button>
+            </SimpleDatePicker>
+          </HintLabel>
 
         </div>
 
@@ -687,19 +709,21 @@ export default function Home() {
 
             <div className="space-y-3">
 
-              {activeTasks.length ===
-                0 &&
-                activeMemos.length === 0 &&
+              {activeMemos.length === 0 &&
                 !activeDayShifts.work &&
                 !activeDayShifts.schedule &&
                 activeDeadlines.length ===
+                  0 &&
+                activeTasks.length ===
+                  0 &&
+                overdueTasks.length ===
+                  0 &&
+                backlogTasks.length ===
                   0 && (
-
-                <div className={appSurfaces.emptyPanel}>
-                  予定はありません
-                </div>
-
-              )}
+                  <div className={appSurfaces.emptyPanel}>
+                    予定はありません
+                  </div>
+                )}
 
               {activeMemos.map((memo) => (
                 <button
@@ -792,133 +816,18 @@ export default function Home() {
                 </button>
               ))}
 
-              {activeTasks.map((task) => (
-
-                <button
-                  key={task.id}
-
-                  onClick={() => {
-                    toggleTask(
-                      task.projectId,
-                      task.id
-                    );
-                  }}
-
-                  className={`
-                    ${appSurfaces.taskButton}
-
-                    ${
-                      task.completed
-                        ? `
-                          scale-[0.98]
-                          opacity-55
-                        `
-                        : `
-                          hover:scale-[1.01]
-                        `
-                    }
-                  `}
-                >
-
-                  <div className="flex items-start justify-between">
-
-                    <div className="min-w-0 flex-1">
-
-                      <div className="flex items-center gap-2">
-
-                        <div
-                          className="h-3 w-3 rounded-full shrink-0"
-                          style={{
-                            background:
-                              task.color,
-                          }}
-                        />
-
-                        <p
-                          className={`
-                            truncate
-                            text-sm
-                            font-medium
-                            transition-all
-
-                            ${
-                              task.completed
-                                ? "line-through text-zinc-400 dark:text-zinc-500"
-                                : appSurfaces.bodyText
-                            }
-                          `}
-                        >
-                          {task.title}
-                        </p>
-
-                      </div>
-
-                      <div className="mt-2 pl-5">
-
-                        <p className="truncate text-xs text-zinc-500">
-                          {task.client}
-                        </p>
-
-                        <p className="mt-1 truncate text-xs text-zinc-400">
-                          {task.projectTitle}
-                        </p>
-
-                      </div>
-
-                    </div>
-
-                    {/* チェック */}
-                    <div className="ml-4 pt-1">
-
-                      <div
-                        className={`
-                          flex
-                          h-6
-                          w-6
-                          items-center
-                          justify-center
-                          rounded-full
-                          border
-                          text-[11px]
-                          font-medium
-                          transition-all
-                          duration-300
-
-                          ${
-                            task.completed
-                              ? `
-                                scale-105
-                                text-white
-                              `
-                              : `
-                                bg-white
-                                text-transparent
-                              `
-                          }
-                        `}
-
-                        style={{
-                          background:
-                            task.completed
-                              ? task.color
-                              : "white",
-
-                          borderColor:
-                            task.completed
-                              ? task.color
-                              : "#d4d4d8",
-                        }}
-                      >
-                        ✓
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                </button>
-
-              ))}
+              {(activeTasks.length > 0 ||
+                overdueTasks.length > 0 ||
+                backlogTasks.length > 0) && (
+                <HomeWorkPlanSections
+                  todayString={todayString}
+                  isViewingToday={isViewingToday}
+                  activeTasks={activeTasks}
+                  overdueTasks={overdueTasks}
+                  backlogTasks={backlogTasks}
+                  onToggleTask={toggleTask}
+                />
+              )}
 
             </div>
 

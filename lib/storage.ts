@@ -7,6 +7,7 @@ import {
 import {
   normalizeCustomBackgroundImages,
 } from "@/lib/themeBackgrounds";
+import { normalizeHintMode } from "@/lib/hintMode";
 import { endTutorialSession } from "@/lib/tutorialSession";
 import { normalizeMemoImportance } from "@/lib/memoImportance";
 
@@ -94,10 +95,7 @@ export type ThemeSettings = {
   customBackgroundImages?: string[];
 };
 
-export type HintMode =
-  | "first-run"
-  | "always"
-  | "off";
+export type HintMode = "on" | "off";
 
 export type OnboardingSettings = {
   tutorialCompleted: boolean;
@@ -186,7 +184,7 @@ export function getDefaultTheme(): ThemeSettings {
 const defaultOnboarding: OnboardingSettings =
   {
     tutorialCompleted: false,
-    hintMode: "first-run",
+    hintMode: "off",
     tutorialVersion: 1,
   };
 
@@ -780,6 +778,9 @@ export function getOnboarding(): OnboardingSettings {
     onboardingSnapshot = {
       ...defaultOnboarding,
       ...parsed,
+      hintMode: normalizeHintMode(
+        parsed.hintMode
+      ),
     };
 
     return onboardingSnapshot;

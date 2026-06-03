@@ -17,6 +17,12 @@ import ThemedMain from "@/components/ThemedMain";
 import BottomNav from "@/components/BottomNav";
 import BackgroundImagePicker from "@/components/BackgroundImagePicker";
 import ColorModeToggle from "@/components/ColorModeToggle";
+import HintModeToggle from "@/components/HintModeToggle";
+import {
+  getOnboarding,
+  saveOnboarding,
+} from "@/lib/storage";
+import { useOnboardingSettings } from "@/lib/useOnboardingSettings";
 import ThemeColorPicker from "@/components/ThemeColorPicker";
 import type { ColorMode } from "@/lib/colorMode";
 import { appSurfaces } from "@/lib/appSurfaces";
@@ -43,6 +49,7 @@ const accentColors = [
 
 export default function SettingsPage() {
   const theme = useThemeSettings();
+  const onboarding = useOnboardingSettings();
   const fileInputRef =
     useRef<HTMLInputElement>(
       null
@@ -178,6 +185,24 @@ export default function SettingsPage() {
             value={theme.colorMode ?? "light"}
             onChange={changeColorMode}
           />
+
+          <p className={`mb-3 mt-5 text-xs ${appSurfaces.subtleText}`}>
+            ヒント
+          </p>
+
+          <HintModeToggle
+            value={onboarding.hintMode}
+            onChange={(hintMode) => {
+              saveOnboarding({
+                ...getOnboarding(),
+                hintMode,
+              });
+            }}
+          />
+
+          <p className={`mt-2 text-[10px] leading-snug ${appSurfaces.subtleText}`}>
+            各画面の下に短い説明を出します
+          </p>
         </div>
 
         <ThemeColorPicker

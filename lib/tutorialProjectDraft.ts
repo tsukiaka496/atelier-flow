@@ -4,47 +4,53 @@ import {
   type Project,
   type Task,
 } from "@/lib/storage";
-
-function formatDate(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { addDaysToDateString, formatLocalDate } from "@/lib/taskPlan";
 
 function endOfNextMonth(base: Date) {
   const y = base.getFullYear();
   const m = base.getMonth();
-  // next month last day: (month+2, day 0)
+
   return new Date(y, m + 2, 0);
 }
 
+/** チュートリアル用：日付の間隔と同日グループの例に近い並び */
+const TUTORIAL_TASK_PLAN: Array<{
+  title: string;
+  dayOffset: number;
+}> = [
+  { title: "ラフ", dayOffset: 0 },
+  { title: "線画", dayOffset: 5 },
+  { title: "下塗り", dayOffset: 6 },
+  { title: "下塗り（仕上げ）", dayOffset: 6 },
+  { title: "着色", dayOffset: 7 },
+  { title: "その他", dayOffset: 8 },
+];
+
 export function createTutorialProjectDraft(now = new Date()): {
-  project: Pick<Project, "client" | "title" | "deadline" | "color" | "isTutorial">;
+  project: Pick<
+    Project,
+    "client" | "title" | "deadline" | "color" | "isTutorial"
+  >;
   tasks: Array<Pick<Task, "title" | "date">>;
 } {
-  const deadline = formatDate(endOfNextMonth(now));
+  const baseDay = formatLocalDate(now);
+  const deadline = formatLocalDate(
+    endOfNextMonth(now)
+  );
 
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
+  const tasks = TUTORIAL_TASK_PLAN.map(
+    (item) => ({
+      title: item.title,
+      date: addDaysToDateString(
+        baseDay,
+        item.dayOffset
+      ),
+    })
+  );
 
-  const taskTitles = [
-    "大ラフ",
-    "ラフ",
-    "線画",
-    "下塗り",
-    "着色",
-    "予備日",
-  ];
-
-  const tasks = taskTitles.map((title, i) => {
-    const d = new Date(tomorrow);
-    d.setDate(tomorrow.getDate() + i);
-    return { title, date: formatDate(d) };
-  });
-
-  // pastel-ish purple (project color, NOT tutorial UI)
-  const pastelPurple = normalizeProjectColor("#c4b5fd") || DEFAULT_PROJECT_COLOR;
+  const pastelPurple =
+    normalizeProjectColor("#c4b5fd") ||
+    DEFAULT_PROJECT_COLOR;
 
   return {
     project: {
@@ -57,4 +63,3 @@ export function createTutorialProjectDraft(now = new Date()): {
     tasks,
   };
 }
-
