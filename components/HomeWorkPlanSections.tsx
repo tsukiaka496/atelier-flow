@@ -2,27 +2,13 @@
 
 import Link from "next/link";
 
-import HintLabel from "@/components/onboarding/HintLabel";
 import { appSurfaces } from "@/lib/appSurfaces";
-import { formatPlanDateLabel } from "@/lib/taskPlan";
-
-export type HomeEnrichedTask = {
-  id: string;
-  title: string;
-  completed: boolean;
-  date: string;
-  projectId: string;
-  color: string;
-  projectTitle: string;
-  client: string;
-};
+import type { HomeEnrichedTask } from "@/lib/taskPlan";
 
 type HomeWorkPlanSectionsProps = {
-  todayString: string;
   isViewingToday: boolean;
   activeTasks: HomeEnrichedTask[];
   overdueTasks: HomeEnrichedTask[];
-  backlogTasks: HomeEnrichedTask[];
   onToggleTask: (
     projectId: string,
     taskId: string
@@ -30,16 +16,15 @@ type HomeWorkPlanSectionsProps = {
 };
 
 function TaskRow({
-  task,
-  referenceDay,
+  item,
   onToggleTask,
-  showPreviousPlan,
 }: {
-  task: HomeEnrichedTask;
-  referenceDay: string;
+  item: HomeEnrichedTask;
   onToggleTask: HomeWorkPlanSectionsProps["onToggleTask"];
-  showPreviousPlan?: boolean;
 }) {
+  const { task, projectId, projectColor, projectTitle, client } =
+    item;
+
   return (
     <div
       className={`
@@ -55,10 +40,7 @@ function TaskRow({
       <button
         type="button"
         onClick={() =>
-          onToggleTask(
-            task.projectId,
-            task.id
-          )
+          onToggleTask(projectId, task.id)
         }
         className="
           w-full
@@ -74,7 +56,7 @@ function TaskRow({
               <div
                 className="h-3 w-3 shrink-0 rounded-full"
                 style={{
-                  background: task.color,
+                  background: projectColor,
                 }}
               />
 
@@ -98,23 +80,12 @@ function TaskRow({
 
             <div className="mt-2 pl-5">
               <p className="truncate text-xs text-zinc-500">
-                {task.client}
+                {client}
               </p>
 
               <p className="mt-1 truncate text-xs text-zinc-400">
-                {task.projectTitle}
+                {projectTitle}
               </p>
-
-              {showPreviousPlan &&
-                task.date && (
-                  <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
-                    予定日:{" "}
-                    {formatPlanDateLabel(
-                      task.date,
-                      referenceDay
-                    )}
-                  </p>
-                )}
             </div>
           </div>
 
@@ -141,10 +112,10 @@ function TaskRow({
               `}
               style={{
                 background: task.completed
-                  ? task.color
+                  ? projectColor
                   : "white",
                 borderColor: task.completed
-                  ? task.color
+                  ? projectColor
                   : "#d4d4d8",
               }}
             >
@@ -158,34 +129,27 @@ function TaskRow({
 }
 
 export default function HomeWorkPlanSections({
-  todayString,
   isViewingToday,
   activeTasks,
   overdueTasks,
-  backlogTasks,
   onToggleTask,
 }: HomeWorkPlanSectionsProps) {
   const rescheduleProjectLinks = (() => {
-    const links = new Map<
-      string,
-      string
-    >();
+    const links = new Map<string, string>();
 
-    for (const task of [
+    for (const item of [
       ...overdueTasks,
       ...activeTasks.filter(
-        (item) => !item.completed
+        (entry) => !entry.task.completed
       ),
     ]) {
-      if (links.has(task.projectId)) {
+      if (links.has(item.projectId)) {
         continue;
       }
 
       links.set(
-        task.projectId,
-        task.client ||
-          task.projectTitle ||
-          "案件"
+        item.projectId,
+        item.client || item.projectTitle || "案件"
       );
     }
 
@@ -193,7 +157,6 @@ export default function HomeWorkPlanSections({
   })();
 
   return (
-    <HintLabel hintId="home-work">
     <div className="space-y-4">
       {rescheduleProjectLinks.size > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -221,50 +184,27 @@ export default function HomeWorkPlanSections({
 
       {activeTasks.length > 0 && (
         <div className="space-y-3">
-          {activeTasks.map((task) => (
+          {activeTasks.map((item) => (
             <TaskRow
-              key={`${task.projectId}-${task.id}`}
-              task={task}
-              referenceDay={todayString}
+              key={`${item.projectId}-${item.task.id}`}
+              item={item}
               onToggleTask={onToggleTask}
             />
           ))}
         </div>
       )}
 
-      {isViewingToday &&
-        overdueTasks.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-              予定日を過ぎた作業
-            </p>
-
-            <div className="space-y-3">
-              {overdueTasks.map((task) => (
-                <TaskRow
-                  key={`overdue-${task.projectId}-${task.id}`}
-                  task={task}
-                  referenceDay={todayString}
-                  showPreviousPlan
-                  onToggleTask={onToggleTask}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-      {backlogTasks.length > 0 && (
+      {isViewingToday && overdueTasks.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            予定日なしの作業
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+            予定日を過ぎた作業
           </p>
 
           <div className="space-y-3">
-            {backlogTasks.map((task) => (
+            {overdueTasks.map((item) => (
               <TaskRow
-                key={`backlog-${task.projectId}-${task.id}`}
-                task={task}
-                referenceDay={todayString}
+                key={`overdue-${item.projectId}-${item.task.id}`}
+                item={item}
                 onToggleTask={onToggleTask}
               />
             ))}
@@ -273,8 +213,7 @@ export default function HomeWorkPlanSections({
       )}
 
       {activeTasks.length === 0 &&
-        overdueTasks.length === 0 &&
-        backlogTasks.length === 0 && (
+        (!isViewingToday || overdueTasks.length === 0) && (
           <div className={appSurfaces.emptyPanel}>
             この日に予定された作業はありません。
             <Link
@@ -286,6 +225,5 @@ export default function HomeWorkPlanSections({
           </div>
         )}
     </div>
-    </HintLabel>
   );
 }

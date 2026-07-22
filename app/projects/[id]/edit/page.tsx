@@ -5,196 +5,84 @@ import {
   useParams,
   useRouter,
 } from "next/navigation";
+import { useState } from "react";
 
 import {
   normalizeProject,
   normalizeProjectColor,
-  Project,
-  Task,
+  type Project,
+  type ScheduleSlot,
+  type Task,
 } from "@/lib/storage";
-import { getProjectsRepo, saveProjectsRepo } from "@/lib/projectsRepo";
-
 import {
-  useState,
-} from "react";
-
-import ThemedMain from "@/components/ThemedMain";
+  getProjectsRepo,
+  saveProjectsRepo,
+} from "@/lib/projectsRepo";
+import {
+  createScheduleSlot,
+  ensureTaskScheduleSlots,
+  getOrderedTaskSlots,
+  pairTasksWithScheduleSlots,
+  removeSlotsForTask,
+} from "@/lib/scheduleHelpers";
+import { appSurfaces } from "@/lib/appSurfaces";
 import { theme } from "@/lib/themeClasses";
+
+import PageShell from "@/components/PageShell";
 import DeadlineField from "@/components/DeadlineField";
-import TaskScheduleDateInput from "@/components/TaskScheduleDateInput";
+import TaskEditorSheet from "@/components/TaskEditorSheet";
+import TaskWorkScheduleRow from "@/components/TaskWorkScheduleRow";
+
+function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
+  const next = index + direction;
+
+  if (next < 0 || next >= items.length) {
+    return items;
+  }
+
+  const copied = [...items];
+  [copied[index], copied[next]] = [copied[next], copied[index]];
+  return copied;
+}
 
 export default function EditProjectPage() {
   const params = useParams();
-
   const router = useRouter();
 
-  const [project, setProject] =
-    useState<Project | null>(() => {
-      const id = String(params.id);
-      const projects = getProjectsRepo();
-      const found = projects.find((p) => p.id === id);
-      return found ? normalizeProject(found) : null;
-    });
-
-  const [newTask, setNewTask] =
-    useState("");
-
-  const [newTaskDate, setNewTaskDate] =
-    useState("");
-
-  function updateField(
-    key: keyof Project,
-    value: string
-  ) {
-    if (!project) return;
-
-    setProject({
-      ...project,
-      [key]: value,
-    });
-  }
-
-  function addTask() {
-    if (!project) return;
-
-    if (!newTask.trim()) return;
-
-    const task: Task = {
-      id: crypto.randomUUID(),
-      title: newTask,
-      completed: false,
-      date: newTaskDate,
-    };
-
-    setProject({
-      ...project,
-      tasks: [...project.tasks, task],
-    });
-
-    setNewTask("");
-    setNewTaskDate("");
-  }
-
-  function deleteTask(taskId: string) {
-    if (!project) return;
-
-    setProject({
-      ...project,
-
-      tasks: project.tasks.filter(
-        (task) => task.id !== taskId
-      ),
-    });
-  }
-
-  function moveTaskUp(index: number) {
-    if (!project) return;
-
-    if (index === 0) return;
-
-    const tasks = [...project.tasks];
-
-    [
-      tasks[index - 1],
-      tasks[index],
-    ] = [
-      tasks[index],
-      tasks[index - 1],
-    ];
-
-    setProject({
-      ...project,
-      tasks,
-    });
-  }
-
-  function moveTaskDown(index: number) {
-    if (!project) return;
-
-    if (
-      index ===
-      project.tasks.length - 1
-    ) {
-      return;
+  const [project, setProject] = useState<Project | null>(() => {
+    const id = String(params.id);
+    const found = getProjectsRepo().find((item) => item.id === id);
+    if (!found) {
+      return null;
     }
-
-    const tasks = [...project.tasks];
-
-    [
-      tasks[index + 1],
-      tasks[index],
-    ] = [
-      tasks[index],
-      tasks[index + 1],
-    ];
-
-    setProject({
-      ...project,
-      tasks,
-    });
-  }
-
-  function updateTaskDate(
-    taskId: string,
-    value: string
-  ) {
-    if (!project) return;
-
-    setProject({
-      ...project,
-
-      tasks: project.tasks.map(
-        (task) => {
-
-          if (task.id !== taskId) {
-            return task;
-          }
-
-          return {
-            ...task,
-            date: value,
-          };
-        }
+    const normalized = normalizeProject(found);
+    return {
+      ...normalized,
+      schedule: ensureTaskScheduleSlots(
+        normalized.tasks,
+        normalized.schedule
       ),
-    });
-  }
+    };
+  });
 
-  function saveProject() {
-    if (!project) return;
-
-    const normalized =
-      normalizeProject(project);
-
-    const projects = getProjectsRepo();
-
-    const updatedProjects =
-      projects.map((p) =>
-        p.id === normalized.id
-          ? normalized
-          : p
-      );
-
-    saveProjectsRepo(updatedProjects);
-
-    router.push(
-      `/projects/${project.id}`
-    );
-  }
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(
+    null
+  );
+  const [editTitle, setEditTitle] = useState("");
 
   if (!project) {
     const exists = getProjectsRepo().some(
-      (item) =>
-        item.id === String(params.id)
+      (item) => item.id === String(params.id)
     );
 
     if (!exists) {
       return (
-        <ThemedMain className="px-5 py-8 pb-32">
+        <PageShell title="案件編集" showNav={false}>
           <div className="mx-auto max-w-md text-center">
-            <p className="text-zinc-500 dark:text-zinc-400">
+            <p className={appSurfaces.subtleText}>
               案件が見つかりません
             </p>
-
             <Link
               href="/projects"
               className="mt-4 inline-block text-sm text-sky-600 dark:text-sky-400"
@@ -202,364 +90,345 @@ export default function EditProjectPage() {
               案件一覧へ戻る
             </Link>
           </div>
-        </ThemedMain>
+        </PageShell>
       );
     }
 
     return (
-      <ThemedMain className="p-6">
-        <p className="text-zinc-400 dark:text-zinc-500">
-          読み込み中...
-        </p>
-      </ThemedMain>
+      <PageShell title="案件編集" showNav={false}>
+        <p className={appSurfaces.subtleText}>読み込み中...</p>
+      </PageShell>
     );
   }
 
+  function updateField(
+    key: "client" | "title" | "deadline" | "color",
+    value: string
+  ) {
+    setProject({
+      ...project!,
+      [key]: value,
+    });
+  }
+
+  function addTask() {
+    if (!newTaskTitle.trim()) return;
+
+    const taskId = crypto.randomUUID();
+    const nextTasks: Task[] = [
+      ...project!.tasks,
+      {
+        id: taskId,
+        title: newTaskTitle.trim(),
+        completed: false,
+      },
+    ];
+
+    setProject({
+      ...project!,
+      tasks: nextTasks,
+      schedule: [
+        ...ensureTaskScheduleSlots(
+          project!.tasks,
+          project!.schedule
+        ),
+        createScheduleSlot("", taskId),
+      ],
+    });
+    setNewTaskTitle("");
+  }
+
+  function setScheduleDateAtIndex(
+    index: number,
+    date: string
+  ) {
+    const next = ensureTaskScheduleSlots(
+      project!.tasks,
+      project!.schedule
+    );
+    const taskSlots = getOrderedTaskSlots(
+      project!.tasks,
+      next
+    );
+    const others = next.filter((slot) => !slot.taskId);
+
+    if (!taskSlots[index]) {
+      return;
+    }
+
+    const nextSlots = taskSlots.map((slot, slotIndex) =>
+      slotIndex === index ? { ...slot, date } : slot
+    );
+
+    setProject({
+      ...project!,
+      schedule: pairTasksWithScheduleSlots(
+        project!.tasks,
+        nextSlots,
+        others
+      ),
+    });
+  }
+
+  function reorderTasks(index: number, direction: -1 | 1) {
+    const nextTasks = moveItem(
+      project!.tasks,
+      index,
+      direction
+    );
+    const next = ensureTaskScheduleSlots(
+      project!.tasks,
+      project!.schedule
+    );
+    const taskSlots = getOrderedTaskSlots(
+      project!.tasks,
+      next
+    );
+    const others = next.filter((slot) => !slot.taskId);
+
+    setProject({
+      ...project!,
+      tasks: nextTasks,
+      schedule: pairTasksWithScheduleSlots(
+        nextTasks,
+        taskSlots,
+        others
+      ),
+    });
+  }
+
+  function reorderScheduleSlots(
+    index: number,
+    direction: -1 | 1
+  ) {
+    const next = ensureTaskScheduleSlots(
+      project!.tasks,
+      project!.schedule
+    );
+    const taskSlots = getOrderedTaskSlots(
+      project!.tasks,
+      next
+    );
+    const others = next.filter((slot) => !slot.taskId);
+
+    setProject({
+      ...project!,
+      schedule: pairTasksWithScheduleSlots(
+        project!.tasks,
+        moveItem(taskSlots, index, direction),
+        others
+      ),
+    });
+  }
+
+  function deleteTask(taskId: string) {
+    const confirmed = window.confirm("この作業を削除しますか？");
+    if (!confirmed) return;
+
+    setProject({
+      ...project!,
+      tasks: project!.tasks.filter((task) => task.id !== taskId),
+      schedule: removeSlotsForTask(project!.schedule, taskId),
+    });
+
+    if (editingTaskId === taskId) {
+      closeTaskEditor();
+    }
+  }
+
+  function openTaskEditor(taskId: string) {
+    const task = project!.tasks.find(
+      (item) => item.id === taskId
+    );
+
+    if (!task) {
+      return;
+    }
+
+    setEditingTaskId(task.id);
+    setEditTitle(task.title);
+  }
+
+  function closeTaskEditor() {
+    setEditingTaskId(null);
+    setEditTitle("");
+  }
+
+  function saveTaskEdits() {
+    if (!editingTaskId) {
+      return;
+    }
+
+    if (!editTitle.trim()) {
+      alert("作業名を入力してください");
+      return;
+    }
+
+    setProject({
+      ...project!,
+      tasks: project!.tasks.map((task) =>
+        task.id === editingTaskId
+          ? { ...task, title: editTitle.trim() }
+          : task
+      ),
+    });
+
+    closeTaskEditor();
+  }
+
+  function saveProject() {
+    const normalized = normalizeProject({
+      ...project!,
+      schedule: ensureTaskScheduleSlots(
+        project!.tasks,
+        project!.schedule
+      ),
+    });
+    const projects = getProjectsRepo();
+
+    saveProjectsRepo(
+      projects.map((item) =>
+        item.id === normalized.id ? normalized : item
+      )
+    );
+
+    router.push(`/projects/${project!.id}`);
+  }
+
   return (
-    <ThemedMain className="px-5 py-8 pb-32">
-
-      <div className="mx-auto max-w-md">
-
-        {/* 戻る */}
+    <PageShell title="案件編集" showNav={false}>
+      <div className="mx-auto max-w-xl">
         <Link
           href={`/projects/${project.id}`}
-          className="
-            mb-6
-            inline-flex
-            items-center
-            gap-2
-
-            rounded-full
-
-            bg-white/70 dark:bg-zinc-900/75
-
-            px-4
-            py-2
-
-            text-sm
-            text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
-
-            backdrop-blur-xl
-
-            shadow-[0_2px_10px_rgba(0,0,0,0.04)]
-          "
+          className={`mb-6 inline-flex items-center gap-2 ${appSurfaces.roundButtonMd}`}
         >
           ← 戻る
         </Link>
 
-        {/* カード */}
-        <div
-          className="
-            rounded-[38px]
+        <div className={appSurfaces.heroCardLg}>
+          <div className={appSurfaces.heroSheen} />
 
-            border border-white/60 dark:border-zinc-700/50
-
-            bg-white/75 dark:bg-zinc-900/80
-
-            p-6
-
-            backdrop-blur-2xl
-
-            shadow-[0_10px_40px_rgba(0,0,0,0.06)]
-          "
-        >
-
-          <h1 className="mb-8 text-2xl font-semibold">
-            案件編集
-          </h1>
-
-          {/* 依頼主 */}
-          <div className="mb-6">
-
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
-              依頼主
-            </p>
-
-            <input
-              value={project.client}
-
-              onChange={(e) =>
-                updateField(
-                  "client",
-                  e.target.value
-                )
-              }
-
-              className="
-                w-full
-
-                rounded-2xl
-
-                border border-zinc-200 dark:border-zinc-700
-
-                bg-white/70 dark:bg-zinc-900/75
-
-                px-4
-                py-4
-
-                outline-none
-              "
-            />
-
-          </div>
-
-          {/* 依頼内容 */}
-          <div className="mb-6">
-
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
-              依頼内容
-            </p>
-
-            <input
-              value={project.title}
-
-              onChange={(e) =>
-                updateField(
-                  "title",
-                  e.target.value
-                )
-              }
-
-              className="
-                w-full
-
-                rounded-2xl
-
-                border border-zinc-200 dark:border-zinc-700
-
-                bg-white/70 dark:bg-zinc-900/75
-
-                px-4
-                py-4
-
-                outline-none
-              "
-            />
-
-          </div>
-
-          <DeadlineField
-            value={project.deadline}
-            onChange={(value) =>
-              updateField("deadline", value)
-            }
-          />
-
-          {/* 色 */}
-          <div className="mb-8">
-
-            <p className="mb-3 text-sm text-zinc-400 dark:text-zinc-500">
-              イメージカラー
-            </p>
-
-            <input
-              type="color"
-
-              value={project.color}
-
-              onChange={(e) =>
-                updateField(
-                  "color",
-                  normalizeProjectColor(
-                    e.target.value
-                  )
-                )
-              }
-
-              className="
-                h-14
-                w-full
-
-                cursor-pointer
-
-                rounded-2xl
-                border-0
-
-                bg-transparent
-              "
-            />
-
-          </div>
-
-          {/* 作業 */}
-          <div>
-
-            <div className="mb-4 flex items-center justify-between">
-
-              <p className="text-sm font-medium">
-                作業
+          <div className="relative z-10">
+            <div className="mb-6">
+              <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
+                依頼主
               </p>
-
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                {project.tasks.length}件
-              </p>
-
+              <input
+                value={project.client}
+                onChange={(event) =>
+                  updateField("client", event.target.value)
+                }
+                className={`px-4 py-4 ${appSurfaces.input}`}
+              />
             </div>
 
-            {/* 作業追加 */}
-            <div className="space-y-3">
-
+            <div className="mb-6">
+              <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
+                依頼内容
+              </p>
               <input
-                value={newTask}
+                value={project.title}
+                onChange={(event) =>
+                  updateField("title", event.target.value)
+                }
+                className={`px-4 py-4 ${appSurfaces.input}`}
+              />
+            </div>
 
-                onChange={(e) =>
-                  setNewTask(
-                    e.target.value
+            <DeadlineField
+              value={project.deadline}
+              onChange={(value) => updateField("deadline", value)}
+            />
+
+            <div className="mb-8">
+              <p className={`mb-3 ${appSurfaces.mutedLabel}`}>
+                イメージカラー
+              </p>
+              <input
+                type="color"
+                value={project.color}
+                onChange={(event) =>
+                  updateField(
+                    "color",
+                    normalizeProjectColor(event.target.value)
                   )
                 }
-
-                placeholder="作業を追加"
-
-                className="
-                  w-full
-
-                  rounded-2xl
-
-                  border border-zinc-200 dark:border-zinc-700
-
-                  bg-white/70 dark:bg-zinc-900/75
-
-                  px-4
-                  py-4
-
-                  outline-none
-                "
+                className="h-14 w-full cursor-pointer rounded-2xl border-0 bg-transparent"
               />
-
-              <TaskScheduleDateInput
-                value={newTaskDate}
-                onChange={setNewTaskDate}
-              />
-
-              <button
-                onClick={addTask}
-
-                className={`w-full py-4 ${theme.btnSolid}`}
-              >
-                作業追加
-              </button>
-
             </div>
 
-            {/* 作業一覧 */}
-            <div className="mt-5 space-y-3">
+            <div className="mb-10">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                  作業と日付
+                </p>
+                <p className={`text-[11px] ${appSurfaces.subtleText}`}>
+                  {project.tasks.length}件
+                </p>
+              </div>
 
-              {project.tasks.map(
-                (task, index) => (
+              <div className="mb-3 flex gap-2">
+                <input
+                  value={newTaskTitle}
+                  onChange={(event) =>
+                    setNewTaskTitle(event.target.value)
+                  }
+                  placeholder="作業を追加"
+                  className={`min-w-0 flex-1 px-3 py-2.5 text-sm ${appSurfaces.input}`}
+                />
+                <button
+                  type="button"
+                  onClick={addTask}
+                  className={`shrink-0 px-4 py-2.5 text-sm ${theme.btnSolid}`}
+                >
+                  追加
+                </button>
+              </div>
 
-                  <div
-                    key={task.id}
+              {project.tasks.length === 0 ? (
+                <div className={`${appSurfaces.emptyPanel} text-xs`}>
+                  作業を追加すると、同じ行に日付も表示されます
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className={`px-0.5 text-[11px] leading-relaxed ${appSurfaces.subtleText}`}>
+                    左右の↑↓で、作業と日付を別々に並べ替えできます
+                  </p>
+                  {(() => {
+                    const scheduleSlots = getOrderedTaskSlots(
+                      project.tasks,
+                      project.schedule
+                    );
 
-                    className="
-                      rounded-[24px]
-
-                      border border-zinc-200 dark:border-zinc-700
-
-                      bg-white/70 dark:bg-zinc-900/75
-
-                      p-4
-                    "
-                  >
-
-                    <div className="flex items-start justify-between">
-
-                      <div className="flex-1">
-
-                        <p className="text-sm font-medium">
-                          {task.title}
-                        </p>
-
-                        <TaskScheduleDateInput
-                          value={task.date}
-                          onChange={(date) =>
-                            updateTaskDate(
-                              task.id,
-                              date
-                            )
-                          }
-                        />
-
-                      </div>
-
-                      <div className="ml-3 flex flex-col gap-2">
-
-                        <button
-                          onClick={() =>
-                            moveTaskUp(index)
-                          }
-
-                          className="
-                            rounded-xl
-                            bg-zinc-100
-                            px-3
-                            py-1
-                            text-xs
-                            text-zinc-700
-                            dark:bg-zinc-800
-                            dark:text-zinc-200
-                          "
-                        >
-                          ↑
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            moveTaskDown(index)
-                          }
-
-                          className="
-                            rounded-xl
-                            bg-zinc-100
-                            px-3
-                            py-1
-                            text-xs
-                            text-zinc-700
-                            dark:bg-zinc-800
-                            dark:text-zinc-200
-                          "
-                        >
-                          ↓
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            deleteTask(task.id)
-                          }
-
-                          className="
-                            rounded-xl
-
-                            bg-red-100
-
-                            px-3
-                            py-1
-
-                            text-xs
-                            text-red-500
-                          "
-                        >
-                          削除
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                )
+                    return project.tasks.map((task, index) => (
+                      <TaskWorkScheduleRow
+                        key={task.id}
+                        title={task.title}
+                        date={scheduleSlots[index]?.date ?? ""}
+                        onDateChange={(date) =>
+                          setScheduleDateAtIndex(index, date)
+                        }
+                        onMoveTask={(direction) =>
+                          reorderTasks(index, direction)
+                        }
+                        onMoveSchedule={(direction) =>
+                          reorderScheduleSlots(index, direction)
+                        }
+                        onEditTask={() => openTaskEditor(task.id)}
+                        onDeleteTask={() => deleteTask(task.id)}
+                      />
+                    ));
+                  })()}
+                </div>
               )}
-
             </div>
 
           </div>
-
         </div>
 
-        {/* 保存 */}
         <button
+          type="button"
           onClick={saveProject}
-
           className={`
             mt-4
             w-full
@@ -572,8 +441,19 @@ export default function EditProjectPage() {
           保存
         </button>
 
+        <TaskEditorSheet
+          open={Boolean(editingTaskId)}
+          title={editTitle}
+          onTitleChange={setEditTitle}
+          onSave={saveTaskEdits}
+          onClose={closeTaskEditor}
+          onDelete={
+            editingTaskId
+              ? () => deleteTask(editingTaskId)
+              : undefined
+          }
+        />
       </div>
-
-    </ThemedMain>
+    </PageShell>
   );
 }

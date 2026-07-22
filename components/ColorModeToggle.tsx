@@ -50,9 +50,9 @@ export default function ColorModeToggle({
                     text-[var(--theme-accent)]
                   `
                   : `
-                    border-zinc-200
-                    bg-white
-                    text-zinc-600
+                    border-zinc-300
+                    bg-zinc-50
+                    text-zinc-700
                     dark:border-zinc-700
                     dark:bg-zinc-900
                     dark:text-zinc-300

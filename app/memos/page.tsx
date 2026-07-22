@@ -18,10 +18,8 @@ import {
 } from "@/lib/memoImportance";
 import type { Memo } from "@/lib/storage";
 import { appSurfaces } from "@/lib/appSurfaces";
-import { isTutorialSessionActive } from "@/lib/tutorialSession";
 
-import ThemedMain from "@/components/ThemedMain";
-import BottomNav from "@/components/BottomNav";
+import PageShell from "@/components/PageShell";
 import MemoEditorSheet from "@/components/MemoEditorSheet";
 import QuickMemoComposer from "@/components/QuickMemoComposer";
 
@@ -277,8 +275,6 @@ export default function MemosPage() {
     importance: number;
   }) {
     const now = new Date().toISOString();
-    const tutorialFlag =
-      isTutorialSessionActive();
 
     addMemoRepo({
       id: crypto.randomUUID(),
@@ -289,9 +285,6 @@ export default function MemosPage() {
       isCompleted: false,
       createdAt: now,
       updatedAt: now,
-      isTutorial: tutorialFlag
-        ? true
-        : undefined,
     });
   }
 
@@ -327,21 +320,9 @@ export default function MemosPage() {
   const sorted = sortMemos(filtered, sortType);
 
   return (
-    <ThemedMain className="px-5 py-8 pb-32">
+    <PageShell title="メモ">
       <div className="mx-auto max-w-md">
-        <div className="mb-6">
-          <p className={appSurfaces.mutedLabel}>
-            memo list
-          </p>
-
-          <h1 className={`mt-1 ${appSurfaces.pageTitle}`}>
-            メモ
-          </h1>
-        </div>
-
-        <QuickMemoComposer
-          onAdd={addQuickMemo}
-        />
+        <QuickMemoComposer onAdd={addQuickMemo} />
 
         <div className="mb-5 flex flex-wrap gap-2">
           <button
@@ -440,131 +421,133 @@ export default function MemosPage() {
               exitingMemoIds.includes(memo.id);
 
             return (
-            <div
-              key={memo.id}
-              className={`
-                p-5
-                ${appSurfaces.card}
-                overflow-hidden
+              <div
+                key={memo.id}
+                className={`
+                  p-5
+                  ${appSurfaces.card}
+                  overflow-hidden
 
-                ${
-                  isExiting
-                    ? "memo-complete-exit"
-                    : ""
-                }
-              `}
-            >
-              <div className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    toggleMemoComplete(memo.id)
+                  ${
+                    isExiting
+                      ? "memo-complete-exit"
+                      : ""
                   }
-                  className="
-                    mt-0.5
-                    flex
-                    h-6
-                    w-6
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-full
-                    border
-                    text-xs
-                  "
-                  style={{
-                    background: memo.isCompleted
-                      ? "var(--theme-accent)"
-                      : "transparent",
-                    borderColor: memo.isCompleted
-                      ? "var(--theme-accent)"
-                      : "#d4d4d8",
-                    color: memo.isCompleted
-                      ? "white"
-                      : "transparent",
-                  }}
-                >
-                  ✓
-                </button>
+                `}
+              >
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toggleMemoComplete(memo.id)
+                    }
+                    className="
+                      mt-0.5
+                      flex
+                      h-6
+                      w-6
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-full
+                      border
+                      text-xs
+                    "
+                    style={{
+                      background: memo.isCompleted
+                        ? "var(--theme-accent)"
+                        : "transparent",
+                      borderColor: memo.isCompleted
+                        ? "var(--theme-accent)"
+                        : "#d4d4d8",
+                      color: memo.isCompleted
+                        ? "white"
+                        : "transparent",
+                    }}
+                  >
+                    ✓
+                  </button>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <p
-                      className={`whitespace-pre-wrap text-[15px] font-medium ${
-                        memo.isCompleted
-                          ? "text-zinc-400 line-through"
-                          : ""
-                      }`}
-                    >
-                      {getMemoText(memo)}
-                    </p>
-
-                    {isMemoImportant(
-                      memo.importance
-                    ) && (
-                      <span
-                        className="
-                          shrink-0
-                          rounded-full
-                          bg-amber-100
-                          px-2
-                          py-1
-                          text-[10px]
-                          text-amber-700
-                          dark:bg-amber-900/40
-                          dark:text-amber-300
-                        "
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p
+                        className={`whitespace-pre-wrap text-[15px] font-medium ${
+                          memo.isCompleted
+                            ? "text-zinc-400 line-through"
+                            : ""
+                        }`}
                       >
-                        重要
-                      </span>
-                    )}
+                        {getMemoText(memo)}
+                      </p>
+
+                      {isMemoImportant(
+                        memo.importance
+                      ) && (
+                        <span
+                          className="
+                            shrink-0
+                            rounded-full
+                            bg-amber-100
+                            px-2
+                            py-1
+                            text-[10px]
+                            text-amber-700
+                            dark:bg-amber-900/40
+                            dark:text-amber-300
+                          "
+                        >
+                          重要
+                        </span>
+                      )}
+                    </div>
+
+                    <p
+                      className={`mt-2 text-xs ${appSurfaces.subtleText}`}
+                    >
+                      {memo.date
+                        ? `日付: ${memo.date}`
+                        : "日付なし"}
+                    </p>
                   </div>
 
-                  <p className={`mt-2 text-xs ${appSurfaces.subtleText}`}>
-                    {memo.date
-                      ? `日付: ${memo.date}`
-                      : "日付なし"}
-                  </p>
-                </div>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openMemoEditor(memo)
+                      }
+                      className="
+                        rounded-xl
+                        bg-zinc-100
+                        px-3
+                        py-1
+                        text-xs
+                        dark:bg-zinc-800
+                      "
+                    >
+                      編集
+                    </button>
 
-                <div className="flex shrink-0 flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openMemoEditor(memo)
-                    }
-                    className="
-                      rounded-xl
-                      bg-zinc-100
-                      px-3
-                      py-1
-                      text-xs
-                      dark:bg-zinc-800
-                    "
-                  >
-                    編集
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      deleteMemo(memo.id)
-                    }
-                    className="
-                      rounded-xl
-                      bg-red-100
-                      px-3
-                      py-1
-                      text-xs
-                      text-red-500
-                    "
-                  >
-                    削除
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        deleteMemo(memo.id)
+                      }
+                      className="
+                        rounded-xl
+                        bg-red-100
+                        px-3
+                        py-1
+                        text-xs
+                        text-red-500
+                      "
+                    >
+                      削除
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
+            );
           })}
         </div>
       </div>
@@ -585,8 +568,6 @@ export default function MemosPage() {
             : undefined
         }
       />
-
-      <BottomNav />
-    </ThemedMain>
+    </PageShell>
   );
 }

@@ -7,15 +7,18 @@ import {
 import {
   normalizeCustomBackgroundImages,
 } from "@/lib/themeBackgrounds";
-import { normalizeHintMode } from "@/lib/hintMode";
-import { endTutorialSession } from "@/lib/tutorialSession";
 import { normalizeMemoImportance } from "@/lib/memoImportance";
 
 export type Task = {
   id: string;
   title: string;
   completed: boolean;
+};
+
+export type ScheduleSlot = {
+  id: string;
   date: string;
+  taskId?: string;
 };
 
 export type Project = {
@@ -25,10 +28,9 @@ export type Project = {
   color: string;
   deadline: string;
   tasks: Task[];
+  schedule: ScheduleSlot[];
   /** 作業がない案件の手動完了（100% / 0%） */
   manualCompleted?: boolean;
-  /** チュートリアルで作成した案件（将来の除外/分析用） */
-  isTutorial?: boolean;
 };
 
 export type ShiftTemplateKind =
@@ -59,19 +61,33 @@ export type Memo = {
   isCompleted: boolean;
   createdAt: string;
   updatedAt: string;
-  isTutorial?: boolean;
 };
 
-export type TutorialTabId =
-  | "home"
-  | "month"
-  | "tasks"
-  | "memo"
-  | "settings";
+export type TimelineSlot = {
+  id: string;
+  /** 開始（分、0:00 からの経過） */
+  minutes: number;
+  /**
+   * 終了（分）。省略時は開始時刻のポイント予定。
+   * 開始より大きいとき範囲予定（終了時刻は含まない）。
+   */
+  endMinutes?: number;
+  label: string;
+};
 
-export type TutorialTabProgress = {
-  completed: boolean;
-  skipped: boolean;
+export type TimelinePlan = {
+  weekday: TimelineSlot[];
+  holiday: TimelineSlot[];
+};
+
+export type ThemeSettings = {
+  background: string;
+  accent: string;
+  backgroundImage: string;
+  colorMode?: "light" | "dark";
+  /** data URL で保存するユーザー追加の背景画像 */
+  customBackgroundImages?: string[];
+  monthDisplayMode?: "detailed" | "simple";
 };
 
 export type BackupData = {
@@ -84,27 +100,8 @@ export type BackupData = {
   memos?: Memo[];
   /** 旧バックアップとの互換のため省略可 */
   theme?: ThemeSettings;
-};
-
-export type ThemeSettings = {
-  background: string;
-  accent: string;
-  backgroundImage: string;
-  colorMode?: "light" | "dark";
-  /** data URL で保存するユーザー追加の背景画像 */
-  customBackgroundImages?: string[];
-};
-
-export type HintMode = "on" | "off";
-
-export type OnboardingSettings = {
-  tutorialCompleted: boolean;
-  tutorialCompletedAt?: string;
-  hintMode: HintMode;
-  tutorialVersion?: number;
-  tutorialTabProgress?: Partial<
-    Record<TutorialTabId, TutorialTabProgress>
-  >;
+  /** v3 以降。旧バックアップとの互換のため省略可 */
+  timeline?: TimelinePlan;
 };
 
 const STORAGE_KEY =
@@ -119,19 +116,30 @@ const SHIFT_KEY =
 const THEME_KEY =
   "atelier-flow-theme";
 
-const ONBOARDING_KEY =
-  "atelier-flow-onboarding";
-
 const MEMOS_KEY =
   "atelier-flow-memos";
 
-const ONBOARDING_CHANGED_EVENT =
-  "atelier-flow:onboarding-changed";
+const TIMELINE_KEY =
+  "atelier-flow-timeline";
 
-const BACKUP_VERSION = 2;
+/** 旧オンボーディングキー（clear 時に掃除） */
+const ONBOARDING_KEY =
+  "atelier-flow-onboarding";
+
+const PREF_KEYS = [
+  "atelier-sort",
+  "atelier-show-completed",
+  "atelier-memos-sort",
+  "atelier-show-completed-memos",
+] as const;
+
+const BACKUP_VERSION = 3;
 
 const SHIFTS_CHANGED_EVENT =
   "atelier-flow:shifts-changed";
+
+const TIMELINE_CHANGED_EVENT =
+  "atelier-flow:timeline-changed";
 
 function notifyShiftsChanged() {
   if (typeof window === "undefined") {
@@ -163,11 +171,50 @@ export function subscribeShiftsChanged(
   };
 }
 
+function notifyTimelineChanged() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new Event(TIMELINE_CHANGED_EVENT)
+  );
+}
+
+export function subscribeTimelineChanged(
+  onChange: () => void
+) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener(
+    TIMELINE_CHANGED_EVENT,
+    onChange
+  );
+
+  return () => {
+    window.removeEventListener(
+      TIMELINE_CHANGED_EVENT,
+      onChange
+    );
+  };
+}
+
+function normalizeMonthDisplayMode(
+  value: unknown
+): "detailed" | "simple" {
+  return value === "simple"
+    ? "simple"
+    : "detailed";
+}
+
 const defaultTheme: ThemeSettings = {
-  background: "#f7f7f5",
-  accent: "#38bdf8",
+  background: "#f0b89a",
+  accent: "#f9a8d4",
   backgroundImage: "",
   colorMode: "light",
+  monthDisplayMode: "detailed",
 };
 
 /** SSR / hydration 用の固定参照 */
@@ -181,21 +228,14 @@ export function getDefaultTheme(): ThemeSettings {
   return DEFAULT_THEME;
 }
 
-const defaultOnboarding: OnboardingSettings =
-  {
-    tutorialCompleted: false,
-    hintMode: "off",
-    tutorialVersion: 1,
-  };
-
-export function getDefaultOnboarding(): OnboardingSettings {
-  return defaultOnboarding;
-}
-
 export const EMPTY_PROJECTS: Project[] = [];
 export const EMPTY_SHIFTS: Shift[] = [];
 export const EMPTY_SHIFT_TEMPLATES: ShiftTemplate[] = [];
 export const EMPTY_MEMOS: Memo[] = [];
+export const EMPTY_TIMELINE: TimelinePlan = {
+  weekday: [],
+  holiday: [],
+};
 
 let projectsSnapshotKey: string | null | undefined;
 let projectsSnapshot: Project[] = EMPTY_PROJECTS;
@@ -210,12 +250,11 @@ let shiftTemplatesSnapshot: ShiftTemplate[] =
 let themeSnapshotKey: string | null | undefined;
 let themeSnapshot: ThemeSettings = DEFAULT_THEME;
 
-let onboardingSnapshotKey: string | null | undefined;
-let onboardingSnapshot: OnboardingSettings =
-  defaultOnboarding;
-
 let memosSnapshotKey: string | null | undefined;
 let memosSnapshot: Memo[] = EMPTY_MEMOS;
+
+let timelineSnapshotKey: string | null | undefined;
+let timelineSnapshot: TimelinePlan = EMPTY_TIMELINE;
 
 function invalidateStorageSnapshots() {
   projectsSnapshotKey = undefined;
@@ -226,40 +265,10 @@ function invalidateStorageSnapshots() {
   shiftTemplatesSnapshot = EMPTY_SHIFT_TEMPLATES;
   themeSnapshotKey = undefined;
   themeSnapshot = DEFAULT_THEME;
-  onboardingSnapshotKey = undefined;
-  onboardingSnapshot = defaultOnboarding;
   memosSnapshotKey = undefined;
   memosSnapshot = EMPTY_MEMOS;
-}
-
-function notifyOnboardingChanged() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.dispatchEvent(
-    new Event(ONBOARDING_CHANGED_EVENT)
-  );
-}
-
-export function subscribeOnboardingChanged(
-  onChange: () => void
-) {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-
-  window.addEventListener(
-    ONBOARDING_CHANGED_EVENT,
-    onChange
-  );
-
-  return () => {
-    window.removeEventListener(
-      ONBOARDING_CHANGED_EVENT,
-      onChange
-    );
-  };
+  timelineSnapshotKey = undefined;
+  timelineSnapshot = EMPTY_TIMELINE;
 }
 
 /** 案件イメージカラーの初期値（UIアクセントとは別） */
@@ -298,12 +307,29 @@ export function normalizeTask(
     completed: Boolean(
       task?.completed ?? task?.done
     ),
+  };
+}
 
+export function normalizeScheduleSlot(
+  raw: unknown
+): ScheduleSlot {
+  const slot = raw as Record<string, unknown>;
+
+  const normalized: ScheduleSlot = {
+    id: String(
+      slot?.id ?? crypto.randomUUID()
+    ),
     date:
-      typeof task?.date === "string"
-        ? task.date
+      typeof slot?.date === "string"
+        ? slot.date
         : "",
   };
+
+  if (typeof slot?.taskId === "string") {
+    normalized.taskId = slot.taskId;
+  }
+
+  return normalized;
 }
 
 export function normalizeProject(
@@ -319,6 +345,40 @@ export function normalizeProject(
   )
     ? project.tasks
     : [];
+
+  const tasks = tasksRaw.map(normalizeTask);
+
+  let schedule: ScheduleSlot[];
+
+  if (Array.isArray(project?.schedule)) {
+    schedule = project.schedule.map(
+      normalizeScheduleSlot
+    );
+  } else {
+    // 旧 Task.date → ScheduleSlot へのマイグレーション
+    schedule = [];
+
+    for (let i = 0; i < tasksRaw.length; i++) {
+      const rawTask = tasksRaw[i] as Record<
+        string,
+        unknown
+      >;
+      const date =
+        typeof rawTask?.date === "string"
+          ? rawTask.date
+          : "";
+
+      if (date === "") {
+        continue;
+      }
+
+      schedule.push({
+        id: crypto.randomUUID(),
+        date,
+        taskId: tasks[i].id,
+      });
+    }
+  }
 
   return {
     id: String(
@@ -345,16 +405,13 @@ export function normalizeProject(
         ? project.deadline
         : "",
 
-    tasks: tasksRaw.map(normalizeTask),
+    tasks,
+
+    schedule,
 
     manualCompleted:
       typeof project?.manualCompleted === "boolean"
         ? project.manualCompleted
-        : undefined,
-
-    isTutorial:
-      typeof project?.isTutorial === "boolean"
-        ? project.isTutorial
         : undefined,
   };
 }
@@ -426,6 +483,67 @@ export function normalizeShift(
         : "",
     templateId,
     kind,
+  };
+}
+
+function normalizeTimelineSlot(
+  raw: unknown
+): TimelineSlot {
+  const slot = raw as Record<string, unknown>;
+  const minutesRaw = slot?.minutes;
+  const minutes =
+    typeof minutesRaw === "number" &&
+    Number.isFinite(minutesRaw)
+      ? Math.max(0, Math.floor(minutesRaw))
+      : 0;
+
+  const endRaw = slot?.endMinutes;
+  const endMinutes =
+    typeof endRaw === "number" &&
+    Number.isFinite(endRaw)
+      ? Math.max(0, Math.floor(endRaw))
+      : undefined;
+
+  const normalizedEnd =
+    endMinutes !== undefined &&
+    endMinutes > minutes
+      ? Math.min(24 * 60, endMinutes)
+      : undefined;
+
+  return {
+    id: String(
+      slot?.id ?? crypto.randomUUID()
+    ),
+    minutes: Math.min(23 * 60 + 59, minutes),
+    ...(normalizedEnd !== undefined
+      ? { endMinutes: normalizedEnd }
+      : {}),
+    label:
+      typeof slot?.label === "string"
+        ? slot.label
+        : "",
+  };
+}
+
+export function normalizeTimeline(
+  raw: unknown
+): TimelinePlan {
+  const plan = raw as Record<string, unknown> | null;
+
+  if (!plan || typeof plan !== "object") {
+    return {
+      weekday: [],
+      holiday: [],
+    };
+  }
+
+  return {
+    weekday: Array.isArray(plan.weekday)
+      ? plan.weekday.map(normalizeTimelineSlot)
+      : [],
+    holiday: Array.isArray(plan.holiday)
+      ? plan.holiday.map(normalizeTimelineSlot)
+      : [],
   };
 }
 
@@ -701,6 +819,10 @@ export function getTheme(): ThemeSettings {
         normalizeCustomBackgroundImages(
           parsed.customBackgroundImages
         ),
+      monthDisplayMode:
+        normalizeMonthDisplayMode(
+          parsed.monthDisplayMode
+        ),
     };
 
     return themeSnapshot;
@@ -725,6 +847,10 @@ export function saveTheme(
       normalizeCustomBackgroundImages(
         theme.customBackgroundImages
       ),
+    monthDisplayMode:
+      normalizeMonthDisplayMode(
+        theme.monthDisplayMode
+      ),
   };
 
   const json = JSON.stringify(normalized);
@@ -741,72 +867,6 @@ export function saveTheme(
     normalized.colorMode
   );
   notifyThemeChange(normalized);
-}
-
-/* =========================
-   Onboarding
-========================= */
-
-export function getOnboarding(): OnboardingSettings {
-
-  if (
-    typeof window ===
-    "undefined"
-  ) {
-    return defaultOnboarding;
-  }
-
-  const data =
-    localStorage.getItem(
-      ONBOARDING_KEY
-    );
-
-  if (data === onboardingSnapshotKey) {
-    return onboardingSnapshot;
-  }
-
-  onboardingSnapshotKey = data;
-
-  if (!data) {
-    onboardingSnapshot = defaultOnboarding;
-    return onboardingSnapshot;
-  }
-
-  try {
-    const parsed = JSON.parse(data);
-
-    onboardingSnapshot = {
-      ...defaultOnboarding,
-      ...parsed,
-      hintMode: normalizeHintMode(
-        parsed.hintMode
-      ),
-    };
-
-    return onboardingSnapshot;
-  } catch {
-    onboardingSnapshot = defaultOnboarding;
-    return onboardingSnapshot;
-  }
-}
-
-export function saveOnboarding(
-  settings: OnboardingSettings
-) {
-  const json = JSON.stringify(settings);
-
-  localStorage.setItem(
-    ONBOARDING_KEY,
-    json
-  );
-
-  onboardingSnapshotKey = json;
-  onboardingSnapshot = {
-    ...defaultOnboarding,
-    ...settings,
-  };
-
-  notifyOnboardingChanged();
 }
 
 /* =========================
@@ -860,11 +920,6 @@ export function normalizeMemo(
       typeof memo?.updatedAt === "string"
         ? memo.updatedAt
         : now,
-
-    isTutorial:
-      typeof memo?.isTutorial === "boolean"
-        ? memo.isTutorial
-        : undefined,
   };
 }
 
@@ -914,6 +969,53 @@ export function saveMemos(memos: Memo[]) {
 }
 
 /* =========================
+   Timeline
+========================= */
+
+export function getTimeline(): TimelinePlan {
+  if (typeof window === "undefined") {
+    return EMPTY_TIMELINE;
+  }
+
+  const data =
+    localStorage.getItem(TIMELINE_KEY);
+
+  if (data === timelineSnapshotKey) {
+    return timelineSnapshot;
+  }
+
+  timelineSnapshotKey = data;
+
+  if (!data) {
+    timelineSnapshot = EMPTY_TIMELINE;
+    return timelineSnapshot;
+  }
+
+  try {
+    const parsed = JSON.parse(data);
+    timelineSnapshot = normalizeTimeline(parsed);
+    return timelineSnapshot;
+  } catch {
+    timelineSnapshot = EMPTY_TIMELINE;
+    return timelineSnapshot;
+  }
+}
+
+export function saveTimeline(
+  plan: TimelinePlan
+) {
+  const normalized = normalizeTimeline(plan);
+  const json = JSON.stringify(normalized);
+
+  localStorage.setItem(TIMELINE_KEY, json);
+
+  timelineSnapshotKey = json;
+  timelineSnapshot = normalized;
+
+  notifyTimelineChanged();
+}
+
+/* =========================
    Backup Export
 ========================= */
 
@@ -938,6 +1040,8 @@ export function createBackupData(): BackupData {
     memos: getMemos(),
 
     theme: getTheme(),
+
+    timeline: getTimeline(),
   };
 }
 
@@ -1098,7 +1202,17 @@ export async function importBackupFile(
           normalizeCustomBackgroundImages(
             parsed.theme.customBackgroundImages
           ),
+        monthDisplayMode:
+          normalizeMonthDisplayMode(
+            parsed.theme.monthDisplayMode
+          ),
       });
+    }
+
+    if (parsed.timeline) {
+      saveTimeline(
+        normalizeTimeline(parsed.timeline)
+      );
     }
 
     return {
@@ -1128,8 +1242,8 @@ export function invalidateStorageCacheFromEvent(
     memosSnapshotKey = null;
   }
 
-  if (key === ONBOARDING_KEY || key === null) {
-    onboardingSnapshotKey = null;
+  if (key === TIMELINE_KEY || key === null) {
+    timelineSnapshotKey = null;
   }
 }
 
@@ -1163,10 +1277,17 @@ export function clearAllData() {
     MEMOS_KEY
   );
 
+  localStorage.removeItem(
+    TIMELINE_KEY
+  );
+
+  for (const key of PREF_KEYS) {
+    localStorage.removeItem(key);
+  }
+
   invalidateStorageSnapshots();
-  endTutorialSession();
   notifyShiftsChanged();
+  notifyTimelineChanged();
   applyColorModeClass(DEFAULT_THEME.colorMode);
   notifyThemeChange(DEFAULT_THEME);
-  notifyOnboardingChanged();
 }

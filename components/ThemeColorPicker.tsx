@@ -19,7 +19,7 @@ type ThemeColorPickerProps = {
   onChange: (hex: string) => void;
 };
 
-const inputClass = `${appSurfaces.input} px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200`;
+const inputClass = `${appSurfaces.input} px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200`;
 
 export default function ThemeColorPicker({
   label,
@@ -90,36 +90,66 @@ export default function ThemeColorPicker({
         {label}
       </p>
 
-      <div className="flex flex-wrap gap-3">
-        {presets.map((color) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() =>
-              applyColor(color)
-            }
-            className={`
-              h-10
-              w-10
-              rounded-full
-              border-2
-              shadow-md
-              transition-transform
-              ${
-                normalizedValue === color
-                  ? "scale-110 border-zinc-400"
-                  : "border-white"
-              }
-            `}
-            style={{
-              background: color,
-            }}
-            aria-label={`プリセット ${color}`}
-          />
-        ))}
+      <div
+        className="
+          rounded-2xl
+          border border-white/75
+          bg-white/40
+          p-3.5
+          shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_8px_24px_rgba(249,168,212,0.12)]
+          backdrop-blur-xl
+          dark:border-white/10
+          dark:bg-zinc-800/40
+        "
+      >
+        <div className="flex flex-wrap gap-3">
+          {presets.map((color) => {
+            const selected =
+              normalizedValue === color;
+
+            return (
+              <button
+                key={color}
+                type="button"
+                onClick={() =>
+                  applyColor(color)
+                }
+                className={`
+                  h-12
+                  w-12
+                  rounded-full
+                  border-2
+                  transition-all
+                  duration-200
+                  ${
+                    selected
+                      ? `
+                        scale-110
+                        border-white
+                        shadow-[0_0_0_3px_#f9a8d4,0_6px_16px_rgba(249,168,212,0.45)]
+                        dark:border-zinc-200
+                        dark:shadow-[0_0_0_3px_rgba(249,168,212,0.55),0_4px_14px_rgba(0,0,0,0.35)]
+                      `
+                      : `
+                        border-white
+                        shadow-[0_3px_10px_rgba(251,146,160,0.22)]
+                        dark:border-zinc-600
+                        dark:shadow-[0_2px_8px_rgba(0,0,0,0.25)]
+                      `
+                  }
+                `}
+                style={{
+                  background: color,
+                }}
+                aria-label={`プリセット ${color}`}
+                aria-pressed={selected}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      <div className="mt-5 border-t border-zinc-100 pt-3">
+      <div className="mt-5 border-t border-rose-100 pt-3 dark:border-zinc-700">
         <button
           type="button"
           onClick={() =>
@@ -135,10 +165,16 @@ export default function ThemeColorPicker({
             justify-between
             gap-3
             rounded-2xl
-            px-1
-            py-2
+            border border-white/75
+            bg-white/45
+            px-3
+            py-2.5
             text-left
+            shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]
+            backdrop-blur-md
             transition-colors
+            dark:border-white/10
+            dark:bg-zinc-800/45
           "
         >
           <span className="flex items-center gap-3">
@@ -148,8 +184,9 @@ export default function ThemeColorPicker({
                 w-8
                 shrink-0
                 rounded-xl
-                border border-zinc-200
-                shadow-sm
+                border-2 border-white
+                shadow-[0_0_0_2px_#fbcfe8,0_2px_6px_rgba(249,168,212,0.25)]
+                dark:border-zinc-500
               "
               style={{
                 background:
@@ -157,10 +194,10 @@ export default function ThemeColorPicker({
               }}
             />
             <span>
-              <span className="block text-xs text-zinc-400">
+              <span className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                 カスタム色
               </span>
-              <span className="block text-[11px] text-zinc-500">
+              <span className="block text-[11px] text-zinc-600 dark:text-zinc-400">
                 {normalizedValue}
               </span>
             </span>
@@ -168,8 +205,9 @@ export default function ThemeColorPicker({
           <span
             className={`
               text-xs
-              text-zinc-400
+              text-zinc-500
               transition-transform
+              dark:text-zinc-400
               ${customOpen ? "rotate-180" : ""}
             `}
           >
@@ -178,7 +216,7 @@ export default function ThemeColorPicker({
         </button>
 
         {customOpen && (
-          <div className="mt-3 space-y-3 border-t border-zinc-100 pt-4">
+          <div className="mt-3 space-y-3 border-t border-rose-100 pt-4 dark:border-zinc-700">
 
         <div className="mb-1 flex items-center gap-3">
           <label
@@ -190,8 +228,9 @@ export default function ThemeColorPicker({
               cursor-pointer
               overflow-hidden
               rounded-2xl
-              border border-zinc-200
-              shadow-sm
+              border-2 border-white
+              shadow-[0_0_0_2px_#fbcfe8,0_2px_6px_rgba(249,168,212,0.25)]
+              dark:border-zinc-500
             "
           >
             <input
@@ -224,14 +263,14 @@ export default function ThemeColorPicker({
             />
           </label>
 
-          <p className="text-xs leading-relaxed text-zinc-500">
+          <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
             タップでカラーパレットから選べます
           </p>
         </div>
 
         <div className="space-y-3">
           <div>
-            <p className="mb-1.5 text-xs text-zinc-400">
+            <p className="mb-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-400">
               カラーコード
             </p>
             <div className="flex gap-2">
@@ -253,7 +292,7 @@ export default function ThemeColorPicker({
                     applyFromHexField();
                   }
                 }}
-                placeholder="#f7f7f5"
+                placeholder="#f0b89a"
                 className={inputClass}
               />
               <button
@@ -264,11 +303,16 @@ export default function ThemeColorPicker({
                 className="
                   shrink-0
                   rounded-2xl
-                  border border-zinc-200
-                  bg-white
+                  border border-white/80
+                  bg-white/60
                   px-4
                   text-sm
-                  text-zinc-600
+                  font-medium
+                  text-zinc-700
+                  backdrop-blur-md
+                  dark:border-zinc-600
+                  dark:bg-zinc-800
+                  dark:text-zinc-200
                 "
               >
                 適用
@@ -277,7 +321,7 @@ export default function ThemeColorPicker({
           </div>
 
           <div>
-            <p className="mb-1.5 text-xs text-zinc-400">
+            <p className="mb-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-400">
               RGB（0〜255）
             </p>
             <div className="grid grid-cols-3 gap-2">
@@ -334,12 +378,17 @@ export default function ThemeColorPicker({
                 mt-2
                 w-full
                 rounded-2xl
-                border border-zinc-200
-                bg-white
+                border border-white/80
+                bg-white/60
                 px-4
                 py-3
                 text-sm
-                text-zinc-600
+                font-medium
+                text-zinc-700
+                backdrop-blur-md
+                dark:border-zinc-600
+                dark:bg-zinc-800
+                dark:text-zinc-200
               "
             >
               RGBを適用
@@ -347,12 +396,12 @@ export default function ThemeColorPicker({
           </div>
 
           {hexError && (
-            <p className="text-xs text-red-400">
+            <p className="text-xs text-rose-500">
               {hexError}
             </p>
           )}
 
-          <p className="text-[11px] text-zinc-400">
+          <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
             現在: {normalizedValue}
             {rgbPreview && (
               <>

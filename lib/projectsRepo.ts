@@ -48,10 +48,6 @@ export function subscribeProjectsChanged(
   };
 }
 
-export function isUsingTutorialProjects() {
-  return false;
-}
-
 export function getProjectsRepo(): Project[] {
   return getPersistentProjects();
 }

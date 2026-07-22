@@ -2,223 +2,165 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import {
   DEFAULT_PROJECT_COLOR,
   normalizeProjectColor,
-  Task,
+  type ScheduleSlot,
+  type Task,
 } from "@/lib/storage";
 import { addProjectRepo } from "@/lib/projectsRepo";
-import { setTutorialCreatedProjectId } from "@/lib/tutorialCreatedProject";
-import { isTutorialSessionActive } from "@/lib/tutorialSession";
-import { createTutorialProjectDraft } from "@/lib/tutorialProjectDraft";
-
+import { createProjectTemplateDraft } from "@/lib/projectTemplate";
 import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
-
-import ThemedMain from "@/components/ThemedMain";
+  createScheduleSlot,
+  ensureTaskScheduleSlots,
+  getOrderedTaskSlots,
+  pairTasksWithScheduleSlots,
+  removeSlotsForTask,
+} from "@/lib/scheduleHelpers";
+import { appSurfaces } from "@/lib/appSurfaces";
 import { theme } from "@/lib/themeClasses";
+
+import PageShell from "@/components/PageShell";
 import DeadlineField from "@/components/DeadlineField";
-import TaskScheduleDateInput from "@/components/TaskScheduleDateInput";
 import TaskEditorSheet from "@/components/TaskEditorSheet";
-import { scrollTourTargetIntoView } from "@/lib/tutorialPositioning";
-import {
-  registerTutorialAction,
-  registerTutorialHook,
-  registerTutorialReadyCheck,
-} from "@/lib/tutorialActionRegistry";
-import { useTourAction } from "@/lib/useTourAction";
-import {
-  tourInstanceProps,
-  useTourInstanceId,
-} from "@/lib/useTourInstanceId";
-import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
+import TaskWorkScheduleRow from "@/components/TaskWorkScheduleRow";
+
+function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
+  const next = index + direction;
+
+  if (next < 0 || next >= items.length) {
+    return items;
+  }
+
+  const copied = [...items];
+  [copied[index], copied[next]] = [copied[next], copied[index]];
+  return copied;
+}
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const {
-    bumpTutorialReady,
-    currentStepId,
-    isTutorialActive,
-    runTourAction,
-  } = useOnboarding();
 
-  const fillExampleInstance = useTourInstanceId(
-    "tutorial-fill-example"
+  const [client, setClient] = useState("");
+  const [title, setTitle] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [color, setColor] = useState(DEFAULT_PROJECT_COLOR);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleSlot[]>([]);
+
+  const [taskTitle, setTaskTitle] = useState("");
+
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(
+    null
   );
-  const createProjectInstance = useTourInstanceId(
-    "create-project"
-  );
+  const [editTitle, setEditTitle] = useState("");
 
-  const [client, setClient] =
-    useState("");
-
-  const [title, setTitle] =
-    useState("");
-
-  const [deadline, setDeadline] =
-    useState("");
-
-  const [color, setColor] =
-    useState(DEFAULT_PROJECT_COLOR);
-
-  const [tasks, setTasks] =
-    useState<Task[]>([]);
-
-  const [taskTitle, setTaskTitle] =
-    useState("");
-
-  const [taskDate, setTaskDate] =
-    useState("");
-
-  const [editingTaskId, setEditingTaskId] =
-    useState<string | null>(null);
-
-  const [editTitle, setEditTitle] =
-    useState("");
-
-  const [editDate, setEditDate] =
-    useState("");
-
-  const [exampleApplied, setExampleApplied] =
-    useState(false);
-
-  const applyTutorialExample = useCallback(() => {
-    const draft = createTutorialProjectDraft(new Date());
-    setClient(draft.project.client);
-    setTitle(draft.project.title);
-    setDeadline(draft.project.deadline);
-    setColor(draft.project.color);
-    setTasks(
-      draft.tasks.map((t) => ({
-        id: crypto.randomUUID(),
-        title: t.title,
-        completed: false,
-        date: t.date,
-      }))
-    );
-    setExampleApplied(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const createButton = document.querySelector(
-          '[data-tour="create-project"]'
-        );
-
-        if (createButton instanceof HTMLElement) {
-          scrollTourTargetIntoView(createButton);
-        }
-
-        bumpTutorialReady();
-      });
-    });
-  }, [bumpTutorialReady]);
-
-  const handleFillExample = useTourAction(
-    "tutorial-fill-example",
-    applyTutorialExample
-  );
-
-  useEffect(() => {
-    return registerTutorialAction(
-      "tutorial-fill-example",
-      applyTutorialExample
-    );
-  }, [applyTutorialExample]);
-
-  useEffect(() => {
-    return registerTutorialHook(
-      "project-form-auto-fill",
-      () => {
-        if (!exampleApplied) {
-          applyTutorialExample();
-        }
-      }
-    );
-  }, [applyTutorialExample, exampleApplied]);
-
-  useEffect(() => {
-    if (
-      !isTutorialActive ||
-      currentStepId !== "project-new-create" ||
-      exampleApplied
-    ) {
-      return;
-    }
-
-    applyTutorialExample();
-  }, [
-    applyTutorialExample,
-    currentStepId,
-    exampleApplied,
-    isTutorialActive,
-  ]);
-
-  useEffect(() => {
-    return registerTutorialReadyCheck(
-      "project-form-filled",
-      () =>
-        exampleApplied ||
-        Boolean(client.trim() && title.trim())
-    );
-  }, [client, exampleApplied, title]);
-
-  useEffect(() => {
-    bumpTutorialReady();
-  }, [exampleApplied, bumpTutorialReady]);
+  function applyTemplate() {
+    const draft = createProjectTemplateDraft();
+    setClient(draft.client);
+    setTitle(draft.title);
+    setDeadline(draft.deadline);
+    setColor(draft.color);
+    setTasks(draft.tasks);
+    setSchedule(draft.schedule);
+  }
 
   function addTask() {
     if (!taskTitle.trim()) return;
 
+    const taskId = crypto.randomUUID();
+
     setTasks([
       ...tasks,
-
       {
-        id: crypto.randomUUID(),
-        title: taskTitle,
+        id: taskId,
+        title: taskTitle.trim(),
         completed: false,
-        date: taskDate,
       },
+    ]);
+    setSchedule([
+      ...ensureTaskScheduleSlots(tasks, schedule),
+      createScheduleSlot("", taskId),
     ]);
 
     setTaskTitle("");
-    setTaskDate("");
   }
 
   function removeTask(id: string) {
-    setTasks(
-      tasks.filter(
-        (task) => task.id !== id
+    setTasks(tasks.filter((task) => task.id !== id));
+    setSchedule(removeSlotsForTask(schedule, id));
+
+    if (editingTaskId === id) {
+      closeTaskEditor();
+    }
+  }
+
+  function setScheduleDateAtIndex(
+    index: number,
+    date: string
+  ) {
+    const next = ensureTaskScheduleSlots(tasks, schedule);
+    const taskSlots = getOrderedTaskSlots(tasks, next);
+    const others = next.filter((slot) => !slot.taskId);
+
+    if (!taskSlots[index]) {
+      return;
+    }
+
+    const nextSlots = taskSlots.map((slot, slotIndex) =>
+      slotIndex === index ? { ...slot, date } : slot
+    );
+
+    setSchedule(
+      pairTasksWithScheduleSlots(tasks, nextSlots, others)
+    );
+  }
+
+  function reorderTasks(index: number, direction: -1 | 1) {
+    const nextTasks = moveItem(tasks, index, direction);
+    const next = ensureTaskScheduleSlots(tasks, schedule);
+    const taskSlots = getOrderedTaskSlots(tasks, next);
+    const others = next.filter((slot) => !slot.taskId);
+
+    setTasks(nextTasks);
+    setSchedule(
+      pairTasksWithScheduleSlots(nextTasks, taskSlots, others)
+    );
+  }
+
+  function reorderScheduleSlots(
+    index: number,
+    direction: -1 | 1
+  ) {
+    const next = ensureTaskScheduleSlots(tasks, schedule);
+    const taskSlots = getOrderedTaskSlots(tasks, next);
+    const others = next.filter((slot) => !slot.taskId);
+    setSchedule(
+      pairTasksWithScheduleSlots(
+        tasks,
+        moveItem(taskSlots, index, direction),
+        others
       )
     );
   }
 
   function openTaskEditor(taskId: string) {
-    const task =
-      tasks.find((item) => item.id === taskId) ??
-      null;
+    const task = tasks.find((item) => item.id === taskId);
 
-    if (!task) {
-      return;
-    }
+    if (!task) return;
 
     setEditingTaskId(taskId);
     setEditTitle(task.title);
-    setEditDate(task.date);
   }
 
   function closeTaskEditor() {
     setEditingTaskId(null);
     setEditTitle("");
-    setEditDate("");
   }
 
   function saveTaskEdits() {
-    if (!editingTaskId) {
-      return;
-    }
+    if (!editingTaskId) return;
 
     if (!editTitle.trim()) {
       alert("作業名を入力してください");
@@ -226,483 +168,178 @@ export default function NewProjectPage() {
     }
 
     setTasks(
-      tasks.map((task) => {
-        if (task.id !== editingTaskId) {
-          return task;
-        }
-
-        return {
-          ...task,
-          title: editTitle.trim(),
-          date: editDate,
-        };
-      })
+      tasks.map((task) =>
+        task.id === editingTaskId
+          ? { ...task, title: editTitle.trim() }
+          : task
+      )
     );
 
     closeTaskEditor();
   }
 
-  function moveUp(index: number) {
-    if (index === 0) return;
-
-    const copied = [...tasks];
-
-    [
-      copied[index - 1],
-      copied[index],
-    ] = [
-      copied[index],
-      copied[index - 1],
-    ];
-
-    setTasks(copied);
-  }
-
-  function moveDown(index: number) {
-    if (
-      index === tasks.length - 1
-    ) {
-      return;
-    }
-
-    const copied = [...tasks];
-
-    [
-      copied[index + 1],
-      copied[index],
-    ] = [
-      copied[index],
-      copied[index + 1],
-    ];
-
-    setTasks(copied);
-  }
-
-  const handleCreateProject = useCallback(() => {
-    const projectId = crypto.randomUUID();
-    const inTutorial =
-      isTutorialSessionActive();
-
+  function handleCreate() {
     addProjectRepo({
-      id: projectId,
+      id: crypto.randomUUID(),
       client: client.trim(),
       title: title.trim(),
-      deadline,
       color: normalizeProjectColor(color),
+      deadline,
       tasks,
-      isTutorial: inTutorial ? true : undefined,
+      schedule: ensureTaskScheduleSlots(tasks, schedule),
     });
 
-    if (inTutorial) {
-      setTutorialCreatedProjectId(projectId);
-    }
-
     router.push("/projects");
-
-    if (
-      inTutorial &&
-      currentStepId === "project-new-create"
-    ) {
-      requestAnimationFrame(() => {
-        runTourAction("create-project", {
-          skipExecute: true,
-        });
-      });
-    }
-  }, [
-    client,
-    color,
-    currentStepId,
-    deadline,
-    runTourAction,
-    tasks,
-    title,
-  ]);
+  }
 
   return (
-    <ThemedMain className="px-5 py-8 pb-32">
-
-      <div className="mx-auto min-w-0 max-w-md">
-
-        {/* 戻る */}
+    <PageShell title="案件を作成" showNav={false}>
+      <div className="mx-auto min-w-0 max-w-xl">
         <Link
           href="/projects"
-          className="
-            mb-6
-            inline-flex
-            items-center
-            gap-2
-
-            rounded-full
-
-            bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
-
-            px-4
-            py-2
-
-            text-sm
-            text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500
-
-            backdrop-blur-xl
-
-            shadow-[0_2px_10px_rgba(0,0,0,0.04)]
-          "
+          className={`mb-6 inline-flex items-center gap-2 ${appSurfaces.roundButtonMd}`}
         >
           ← 戻る
         </Link>
 
-        {/* カード */}
-        <div
-          data-tour="project-form"
-          className="
-            rounded-[38px]
+        <div className={`${appSurfaces.heroCardLg}`}>
+          <div className={appSurfaces.heroSheen} />
 
-            border border-white/60 dark:border-zinc-700/50 dark:border-zinc-700/50
-
-            bg-white/75 dark:bg-zinc-900/80 dark:bg-zinc-900/80
-
-            p-6
-
-            backdrop-blur-2xl
-
-            shadow-[0_10px_40px_rgba(0,0,0,0.06)]
-          "
-        >
-
-          <h1 className="mb-8 text-2xl font-semibold">
-            依頼追加
-          </h1>
-
-          {isTutorialSessionActive() && (
-            <div className="mb-5">
-              <button
-                type="button"
-                {...tourInstanceProps(
-                  "tutorial-fill-example",
-                  fillExampleInstance
-                )}
-                onClick={handleFillExample}
-                className={`
-                  w-full
-                  rounded-[24px]
-                  border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-                  bg-white/80 dark:bg-zinc-900/85 dark:bg-zinc-900/85
-                  px-4
-                  py-4
-                  text-sm
-                  text-zinc-700 dark:text-zinc-200 dark:text-zinc-200
-                  shadow-[0_8px_28px_rgba(0,0,0,0.06)]
-                `}
-              >
-                入力例を見る（自動入力）
-              </button>
-            </div>
-          )}
-
-          {/* 依頼主 */}
-          <div className="mb-6">
-
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
-              依頼主
-            </p>
-
-            <input
-              value={client}
-              onChange={(e) =>
-                setClient(e.target.value)
-              }
-              placeholder="例: 依頼主の名前"
-
-              className="
+          <div className="relative z-10">
+            <button
+              type="button"
+              onClick={applyTemplate}
+              className={`
+                mb-6
                 w-full
-
-                rounded-2xl
-
-                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-
-                bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
-
+                rounded-[24px]
+                border border-zinc-200
+                bg-white/80
                 px-4
                 py-4
+                text-sm
+                text-zinc-700
+                shadow-[0_8px_28px_rgba(0,0,0,0.06)]
+                dark:border-zinc-700
+                dark:bg-zinc-900/85
+                dark:text-zinc-200
+              `}
+            >
+              テンプレート作成
+            </button>
 
-                outline-none
-              "
-            />
-
-          </div>
-
-          {/* 内容 */}
-          <div className="mb-6">
-
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
-              依頼内容
-            </p>
-
-            <input
-              value={title}
-              onChange={(e) =>
-                setTitle(e.target.value)
-              }
-              placeholder="例: MVイラスト"
-
-              className="
-                w-full
-
-                rounded-2xl
-
-                border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-
-                bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
-
-                px-4
-                py-4
-
-                outline-none
-              "
-            />
-
-          </div>
-
-          <DeadlineField
-            value={deadline}
-            onChange={setDeadline}
-          />
-
-          {/* 色 */}
-          <div className="mb-8">
-
-            <p className="mb-3 text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
-              イメージカラー
-            </p>
-
-            <input
-              type="color"
-
-              value={color}
-
-              onChange={(e) =>
-                setColor(
-                  normalizeProjectColor(
-                    e.target.value
-                  )
-                )
-              }
-
-              className="
-                h-14
-                w-full
-
-                cursor-pointer
-
-                rounded-2xl
-                border-0
-
-                bg-transparent
-              "
-            />
-
-          </div>
-
-          {/* 作業 */}
-          <div>
-
-            <div className="mb-4 flex items-center justify-between">
-
-              <p className="text-sm font-medium">
-                作業
+            <div className="mb-6">
+              <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
+                依頼主
               </p>
-
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500">
-                {tasks.length}件
-              </p>
-
-            </div>
-
-            {/* 入力 */}
-            <div className="min-w-0 space-y-3">
-
               <input
-                value={taskTitle}
-
-                onChange={(e) =>
-                  setTaskTitle(
-                    e.target.value
-                  )
-                }
-
-                placeholder="例: ラフ提出"
-
-                className="
-                  w-full
-
-                  rounded-2xl
-
-                  border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
-
-                  bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
-
-                  px-4
-                  py-4
-
-                  outline-none
-                "
+                value={client}
+                onChange={(event) => setClient(event.target.value)}
+                placeholder="例: 依頼主の名前"
+                className={`px-4 py-4 ${appSurfaces.input}`}
               />
-
-              <TaskScheduleDateInput
-                value={taskDate}
-                onChange={setTaskDate}
-              />
-
-              <button
-                onClick={addTask}
-
-                className={`w-full py-4 ${theme.btnSolid}`}
-              >
-                作業追加
-              </button>
-
             </div>
 
-            {/* 一覧 */}
-            <div className="mt-5 space-y-3">
+            <div className="mb-6">
+              <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
+                依頼内容
+              </p>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="例: MVイラスト"
+                className={`px-4 py-4 ${appSurfaces.input}`}
+              />
+            </div>
 
-              {tasks.map(
-                (task, index) => (
+            <DeadlineField value={deadline} onChange={setDeadline} />
 
-                  <div
-                    key={task.id}
+            <div className="mb-8">
+              <p className={`mb-3 ${appSurfaces.mutedLabel}`}>
+                イメージカラー
+              </p>
+              <input
+                type="color"
+                value={color}
+                onChange={(event) =>
+                  setColor(normalizeProjectColor(event.target.value))
+                }
+                className="h-14 w-full cursor-pointer rounded-2xl border-0 bg-transparent"
+              />
+            </div>
 
-                    className="
-                      rounded-[24px]
+            <div className="mb-10">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                  作業と日付
+                </p>
+                <p className={`text-[11px] ${appSurfaces.subtleText}`}>
+                  {tasks.length}件
+                </p>
+              </div>
 
-                      border border-zinc-200 dark:border-zinc-700 dark:border-zinc-700
+              <div className="mb-3 flex gap-2">
+                <input
+                  value={taskTitle}
+                  onChange={(event) =>
+                    setTaskTitle(event.target.value)
+                  }
+                  placeholder="作業を追加"
+                  className={`min-w-0 flex-1 px-3 py-2.5 text-sm ${appSurfaces.input}`}
+                />
+                <button
+                  type="button"
+                  onClick={addTask}
+                  className={`shrink-0 px-4 py-2.5 text-sm ${theme.btnSolid}`}
+                >
+                  追加
+                </button>
+              </div>
 
-                      bg-white/70 dark:bg-zinc-900/75 dark:bg-zinc-900/75
+              {tasks.length === 0 ? (
+                <div className={`${appSurfaces.emptyPanel} text-xs`}>
+                  作業を追加すると、同じ行に日付も表示されます
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className={`px-0.5 text-[11px] leading-relaxed ${appSurfaces.subtleText}`}>
+                    左右の↑↓で、作業と日付を別々に並べ替えできます
+                  </p>
+                  {(() => {
+                    const scheduleSlots = getOrderedTaskSlots(
+                      tasks,
+                      schedule
+                    );
 
-                      p-4
-                    "
-                  >
-
-                    <div className="flex items-start justify-between">
-
-                      <div>
-
-                        <p className="text-sm font-medium">
-                          {task.title}
-                        </p>
-
-                        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-
-                          {task.date
-                            ? `やる日: ${task.date}`
-                            : "やる日: 未設定"}
-
-                        </p>
-
-                      </div>
-
-                      <div className="flex gap-2">
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openTaskEditor(task.id)
-                          }
-                          className="
-                            rounded-xl
-                            bg-zinc-100
-                            px-3
-                            py-1
-                            text-xs
-                            dark:bg-zinc-800
-                          "
-                        >
-                          編集
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            moveUp(index)
-                          }
-
-                          className="
-                            rounded-xl
-                            bg-zinc-100
-                            px-3
-                            py-1
-                            text-xs
-                            text-zinc-700
-                            dark:bg-zinc-800
-                            dark:text-zinc-200
-                          "
-                        >
-                          ↑
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            moveDown(index)
-                          }
-
-                          className="
-                            rounded-xl
-                            bg-zinc-100
-                            px-3
-                            py-1
-                            text-xs
-                            text-zinc-700
-                            dark:bg-zinc-800
-                            dark:text-zinc-200
-                          "
-                        >
-                          ↓
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            removeTask(
-                              task.id
-                            )
-                          }
-
-                          className="
-                            rounded-xl
-
-                            bg-red-100
-
-                            px-3
-                            py-1
-
-                            text-xs
-                            text-red-500
-                          "
-                        >
-                          削除
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                )
+                    return tasks.map((task, index) => (
+                      <TaskWorkScheduleRow
+                        key={task.id}
+                        title={task.title}
+                        date={scheduleSlots[index]?.date ?? ""}
+                        onDateChange={(date) =>
+                          setScheduleDateAtIndex(index, date)
+                        }
+                        onMoveTask={(direction) =>
+                          reorderTasks(index, direction)
+                        }
+                        onMoveSchedule={(direction) =>
+                          reorderScheduleSlots(index, direction)
+                        }
+                        onEditTask={() => openTaskEditor(task.id)}
+                        onDeleteTask={() => removeTask(task.id)}
+                      />
+                    ));
+                  })()}
+                </div>
               )}
-
             </div>
 
           </div>
-
         </div>
 
-        {/* 作成 */}
         <button
-          onClick={handleCreateProject}
-          {...tourInstanceProps(
-            "create-project",
-            createProjectInstance
-          )}
-
+          type="button"
+          onClick={handleCreate}
           className={`
             mt-4
             w-full
@@ -712,15 +349,13 @@ export default function NewProjectPage() {
             ${theme.btnSolid}
           `}
         >
-          依頼作成
+          案件作成
         </button>
 
         <TaskEditorSheet
           open={Boolean(editingTaskId)}
           title={editTitle}
-          date={editDate}
           onTitleChange={setEditTitle}
-          onDateChange={setEditDate}
           onSave={saveTaskEdits}
           onClose={closeTaskEditor}
           onDelete={
@@ -729,9 +364,7 @@ export default function NewProjectPage() {
               : undefined
           }
         />
-
       </div>
-
-    </ThemedMain>
+    </PageShell>
   );
 }

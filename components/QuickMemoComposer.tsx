@@ -1,31 +1,18 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 
-import { createTutorialMemoDraft } from "@/lib/tutorialMemoDraft";
-import {
-  registerTutorialAction,
-  registerTutorialHook,
-} from "@/lib/tutorialActionRegistry";
-import { useTourAction } from "@/lib/useTourAction";
-import {
-  tourInstanceProps,
-  useTourInstanceId,
-} from "@/lib/useTourInstanceId";
 import { appSurfaces } from "@/lib/appSurfaces";
 import {
   MEMO_IMPORTANCE_HIGH,
   MEMO_IMPORTANCE_NORMAL,
 } from "@/lib/memoImportance";
+import { formatLocalDate } from "@/lib/taskPlan";
 import { theme } from "@/lib/themeClasses";
-
-import HintLabel from "@/components/onboarding/HintLabel";
-import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 
 type QuickMemoComposerProps = {
   onAdd: (draft: {
@@ -35,34 +22,18 @@ type QuickMemoComposerProps = {
   }) => void;
 };
 
-function formatToday() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(
-    2,
-    "0"
-  );
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 export default function QuickMemoComposer({
   onAdd,
 }: QuickMemoComposerProps) {
-  const { bumpTutorialReady } = useOnboarding();
   const inputRef =
     useRef<HTMLTextAreaElement>(null);
-  const addInstance = useTourInstanceId(
-    "memo-quick-add"
-  );
 
-  const [content, setContent] =
-    useState("");
-  const [noDate, setNoDate] =
-    useState(true);
+  const [content, setContent] = useState("");
+  const [noDate, setNoDate] = useState(true);
   const [date, setDate] = useState("");
-  const [importance, setImportance] =
-    useState(MEMO_IMPORTANCE_NORMAL);
+  const [importance, setImportance] = useState(
+    MEMO_IMPORTANCE_NORMAL
+  );
 
   useEffect(() => {
     inputRef.current?.focus({
@@ -70,37 +41,7 @@ export default function QuickMemoComposer({
     });
   }, []);
 
-  const applyTutorialExample =
-    useCallback(() => {
-      const draft =
-        createTutorialMemoDraft(new Date());
-      setContent(draft.content);
-      setNoDate(false);
-      setDate(draft.date);
-      setImportance(draft.importance);
-      requestAnimationFrame(() => {
-        bumpTutorialReady();
-      });
-    }, [bumpTutorialReady]);
-
-  useEffect(() => {
-    return registerTutorialHook(
-      "memo-form-prepare",
-      applyTutorialExample
-    );
-  }, [applyTutorialExample]);
-
-  useEffect(() => {
-    bumpTutorialReady();
-  }, [
-    content,
-    date,
-    importance,
-    noDate,
-    bumpTutorialReady,
-  ]);
-
-  const submitAction = useCallback(() => {
+  function handleAdd() {
     const text = content.trim();
 
     if (!text) {
@@ -121,33 +62,18 @@ export default function QuickMemoComposer({
     inputRef.current?.focus({
       preventScroll: true,
     });
-  }, [content, date, importance, noDate, onAdd]);
-
-  const handleAdd = useTourAction(
-    "memo-quick-add",
-    submitAction
-  );
-
-  useEffect(() => {
-    return registerTutorialAction(
-      "memo-quick-add",
-      submitAction
-    );
-  }, [submitAction]);
+  }
 
   const isImportant =
     importance >= MEMO_IMPORTANCE_HIGH;
 
   return (
-    <HintLabel hintId="memo-quick-add">
     <div
-      data-tour="memo-quick-compose"
       className={`mb-4 px-3 py-3 ${appSurfaces.cardSm}`}
     >
       <div className="flex items-center gap-2">
         <textarea
           ref={inputRef}
-          data-tour="memo-quick-input"
           value={content}
           onChange={(event) =>
             setContent(event.target.value)
@@ -186,10 +112,6 @@ export default function QuickMemoComposer({
           type="button"
           onClick={handleAdd}
           disabled={!content.trim()}
-          {...tourInstanceProps(
-            "memo-quick-add",
-            addInstance
-          )}
           className={`
             shrink-0
             rounded-2xl
@@ -240,8 +162,10 @@ export default function QuickMemoComposer({
                 return;
               }
 
-              setDate((current) =>
-                current || formatToday()
+              setDate(
+                (current) =>
+                  current ||
+                  formatLocalDate(new Date())
               );
             }}
             className="accent-[var(--theme-accent)]"
@@ -333,6 +257,5 @@ export default function QuickMemoComposer({
         </div>
       </div>
     </div>
-    </HintLabel>
   );
 }

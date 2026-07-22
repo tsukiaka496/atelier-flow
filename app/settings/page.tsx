@@ -5,6 +5,12 @@ import {
   useState,
 } from "react";
 
+import BackgroundImagePicker from "@/components/BackgroundImagePicker";
+import ColorModeToggle from "@/components/ColorModeToggle";
+import PageShell from "@/components/PageShell";
+import ThemeColorPicker from "@/components/ThemeColorPicker";
+import { appSurfaces } from "@/lib/appSurfaces";
+import type { ColorMode } from "@/lib/colorMode";
 import {
   clearAllData,
   exportBackup,
@@ -12,51 +18,38 @@ import {
   saveTheme,
   type ThemeSettings,
 } from "@/lib/storage";
-
-import ThemedMain from "@/components/ThemedMain";
-import BottomNav from "@/components/BottomNav";
-import BackgroundImagePicker from "@/components/BackgroundImagePicker";
-import ColorModeToggle from "@/components/ColorModeToggle";
-import HintModeToggle from "@/components/HintModeToggle";
-import {
-  getOnboarding,
-  saveOnboarding,
-} from "@/lib/storage";
-import { useOnboardingSettings } from "@/lib/useOnboardingSettings";
-import ThemeColorPicker from "@/components/ThemeColorPicker";
-import type { ColorMode } from "@/lib/colorMode";
-import { appSurfaces } from "@/lib/appSurfaces";
 import {
   normalizeCustomBackgroundImages,
 } from "@/lib/themeBackgrounds";
 import { useThemeSettings } from "@/lib/useThemeSettings";
 
 const backgroundColors = [
-  "#f7f7f5",
-  "#f4f6fb",
-  "#fdf6f0",
-  "#f5f5ff",
-  "#eef7f2",
+  "#e8a8b6",
+  "#f0b89a",
+  "#c9a6de",
+  "#8fd4b5",
+  "#e8c86a",
 ];
 
 const accentColors = [
-  "#38bdf8",
-  "#fb7185",
-  "#a78bfa",
-  "#34d399",
-  "#f59e0b",
+  "#f9a8d4",
+  "#fdba74",
+  "#c4b5fd",
+  "#86efac",
+  "#fde047",
 ];
+
+type MonthDisplayMode = "detailed" | "simple";
 
 export default function SettingsPage() {
   const theme = useThemeSettings();
-  const onboarding = useOnboardingSettings();
   const fileInputRef =
-    useRef<HTMLInputElement>(
-      null
-    );
+    useRef<HTMLInputElement>(null);
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
+
+  const monthDisplayMode: MonthDisplayMode =
+    theme.monthDisplayMode ?? "detailed";
 
   function saveCurrentTheme(
     updates: Partial<ThemeSettings>
@@ -71,37 +64,36 @@ export default function SettingsPage() {
     saveCurrentTheme({ colorMode: mode });
   }
 
+  function changeMonthDisplayMode(
+    mode: MonthDisplayMode
+  ) {
+    saveCurrentTheme({
+      monthDisplayMode: mode,
+    });
+  }
+
   async function handleImport(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
-    const file =
-      e.target.files?.[0];
+    const file = e.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        "バックアップを復元しますか？\n現在のデータは上書きされます。"
-      );
+    const confirmed = window.confirm(
+      "バックアップを復元しますか？\n現在のデータは上書きされます。"
+    );
 
     if (!confirmed) {
       return;
     }
 
-    const result =
-      await importBackupFile(
-        file
-      );
+    const result = await importBackupFile(file);
 
-    setMessage(
-      result.message
-    );
+    setMessage(result.message);
 
-    if (
-      result.success
-    ) {
+    if (result.success) {
       setTimeout(() => {
         location.reload();
       }, 1000);
@@ -110,27 +102,20 @@ export default function SettingsPage() {
 
   function handleExport() {
     exportBackup();
-
-    setMessage(
-      "バックアップを書き出しました"
-    );
+    setMessage("バックアップを書き出しました");
   }
 
   function handleClear() {
-    const confirmed =
-      window.confirm(
-        "本当に全データを削除しますか？"
-      );
+    const confirmed = window.confirm(
+      "本当に全データを削除しますか？"
+    );
 
     if (!confirmed) {
       return;
     }
 
     clearAllData();
-
-    setMessage(
-      "全データを削除しました"
-    );
+    setMessage("全データを削除しました");
 
     setTimeout(() => {
       location.reload();
@@ -143,36 +128,20 @@ export default function SettingsPage() {
     );
 
   return (
-    <ThemedMain className="px-5 py-6 pb-32">
+    <PageShell title="設定">
       <div className="mx-auto max-w-md">
-        <div
-          className="mb-6"
-          data-tour="settings-guide"
-        >
-          <p className={appSurfaces.mutedLabel}>
-            application settings
-          </p>
-
-          <h1 className={`mt-1 ${appSurfaces.pageTitle}`}>
-            設定
-          </h1>
-        </div>
-
-        {message && (
+        {message ? (
           <div
             className="mb-5 rounded-2xl px-4 py-3 text-sm text-white"
             style={{
-              background:
-                theme.accent,
+              background: theme.accent,
             }}
           >
             {message}
           </div>
-        )}
+        ) : null}
 
-        <div
-          className={`mb-6 p-5 ${appSurfaces.card}`}
-        >
+        <div className={`mb-6 p-5 ${appSurfaces.card}`}>
           <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
             表示
           </p>
@@ -187,21 +156,72 @@ export default function SettingsPage() {
           />
 
           <p className={`mb-3 mt-5 text-xs ${appSurfaces.subtleText}`}>
-            ヒント
+            月表示モード
           </p>
 
-          <HintModeToggle
-            value={onboarding.hintMode}
-            onChange={(hintMode) => {
-              saveOnboarding({
-                ...getOnboarding(),
-                hintMode,
-              });
-            }}
-          />
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                {
+                  value: "detailed" as const,
+                  label: "詳細モード",
+                },
+                {
+                  value: "simple" as const,
+                  label: "簡易モード",
+                },
+              ]
+            ).map((option) => {
+              const selected =
+                monthDisplayMode ===
+                option.value;
 
-          <p className={`mt-2 text-[10px] leading-snug ${appSurfaces.subtleText}`}>
-            各画面の下に短い説明を出します
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    changeMonthDisplayMode(
+                      option.value
+                    )
+                  }
+                  className={`
+                    rounded-2xl
+                    border
+                    px-4
+                    py-3
+                    text-sm
+                    font-medium
+                    transition-all
+                    active:scale-[0.99]
+                    ${
+                      selected
+                        ? `
+                          border-[var(--theme-accent-border)]
+                          bg-[var(--theme-accent-soft)]
+                          text-[var(--theme-accent)]
+                        `
+                        : `
+                          border-zinc-300
+                          bg-zinc-50
+                          text-zinc-700
+                          dark:border-zinc-700
+                          dark:bg-zinc-900
+                          dark:text-zinc-300
+                        `
+                    }
+                  `}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <p
+            className={`mt-2 text-[10px] leading-snug ${appSurfaces.subtleText}`}
+          >
+            詳細は名前・時間を表示。簡易は仕事の有無だけを切り替えます
           </p>
         </div>
 
@@ -233,7 +253,8 @@ export default function SettingsPage() {
           theme={{
             background: theme.background,
             accent: theme.accent,
-            backgroundImage: theme.backgroundImage,
+            backgroundImage:
+              theme.backgroundImage,
             customBackgroundImages,
           }}
           onChange={(next) => {
@@ -248,18 +269,15 @@ export default function SettingsPage() {
           }}
         />
 
-        <div
-          className={`mb-6 p-5 ${appSurfaces.card}`}
-        >
+        <div className={`mb-6 p-5 ${appSurfaces.card}`}>
           <p className={`mb-4 ${appSurfaces.mutedLabel}`}>
             バックアップ
           </p>
 
           <div className="space-y-3">
             <button
-              onClick={
-                handleExport
-              }
+              type="button"
+              onClick={handleExport}
               className="
                 w-full
                 rounded-2xl
@@ -269,26 +287,27 @@ export default function SettingsPage() {
                 text-white
               "
               style={{
-                background:
-                  theme.accent,
+                background: theme.accent,
               }}
             >
               JSONを書き出す
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 fileInputRef.current?.click()
               }
               className="
                 w-full
                 rounded-2xl
-                border border-zinc-200
-                bg-white
+                border border-zinc-300
+                bg-zinc-50
                 px-4
                 py-3
                 text-sm
-                text-zinc-600
+                font-medium
+                text-zinc-700
                 dark:border-zinc-700
                 dark:bg-zinc-900
                 dark:text-zinc-300
@@ -301,9 +320,7 @@ export default function SettingsPage() {
               type="file"
               accept=".json"
               ref={fileInputRef}
-              onChange={
-                handleImport
-              }
+              onChange={handleImport}
               className="hidden"
             />
           </div>
@@ -320,13 +337,12 @@ export default function SettingsPage() {
           "
         >
           <p className="mb-2 text-sm text-red-400 dark:text-red-300">
-            danger zone
+            危険な操作
           </p>
 
           <button
-            onClick={
-              handleClear
-            }
+            type="button"
+            onClick={handleClear}
             className="
               w-full
               rounded-2xl
@@ -341,8 +357,6 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
-
-      <BottomNav />
-    </ThemedMain>
+    </PageShell>
   );
 }

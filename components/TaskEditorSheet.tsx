@@ -2,15 +2,12 @@
 
 import type { ButtonHTMLAttributes } from "react";
 
-import TaskScheduleDateInput from "@/components/TaskScheduleDateInput";
 import { theme } from "@/lib/themeClasses";
 
 type TaskEditorSheetProps = {
   open: boolean;
   title: string;
-  date: string;
   onTitleChange: (value: string) => void;
-  onDateChange: (value: string) => void;
   onSave: () => void;
   onClose: () => void;
   onDelete?: () => void;
@@ -20,9 +17,7 @@ type TaskEditorSheetProps = {
 export default function TaskEditorSheet({
   open,
   title,
-  date,
   onTitleChange,
-  onDateChange,
   onSave,
   onClose,
   onDelete,
@@ -74,11 +69,6 @@ export default function TaskEditorSheet({
                 text-sm
                 outline-none
               "
-            />
-
-            <TaskScheduleDateInput
-              value={date}
-              onChange={onDateChange}
             />
           </div>
 

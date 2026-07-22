@@ -1,232 +1,266 @@
-/** アプリ共通のライト/ダーク対応サーフェスクラス */
+/** アプリ共通のライト/ダーク対応サーフェス（グラス調） */
+
+const glassLight = `
+  border border-white/75
+  bg-white/68
+  backdrop-blur-2xl
+  shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_8px_32px_rgba(120,90,110,0.1),0_2px_8px_rgba(120,90,110,0.06)]
+`;
+
+const glassLightSolid = `
+  border border-white/80
+  bg-white/78
+  backdrop-blur-2xl
+  shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_36px_rgba(120,90,110,0.12),0_2px_10px_rgba(120,90,110,0.07)]
+`;
+
+const glassDark = `
+  dark:border-white/10
+  dark:bg-zinc-900/55
+  dark:shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_12px_36px_rgba(0,0,0,0.45),0_2px_10px_rgba(0,0,0,0.25)]
+`;
 
 export const appSurfaces = {
   card: `
     rounded-[30px]
-    border border-white/60
-    bg-white/75
-    backdrop-blur-xl
-    shadow-[0_8px_30px_rgba(0,0,0,0.05)]
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/80
-    dark:shadow-[0_8px_30px_rgba(0,0,0,0.28)]
+    ${glassLightSolid}
+    ${glassDark}
   `,
   cardSm: `
     rounded-[28px]
-    border border-white/60
-    bg-white/75
-    backdrop-blur-xl
-    shadow-[0_8px_30px_rgba(0,0,0,0.05)]
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/80
-    dark:shadow-[0_8px_30px_rgba(0,0,0,0.28)]
+    ${glassLight}
+    ${glassDark}
   `,
   panel: `
     rounded-2xl
-    border border-zinc-200
-    bg-white
-    dark:border-zinc-700
-    dark:bg-zinc-900
+    border border-white/75
+    bg-white/65
+    backdrop-blur-xl
+    shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_4px_18px_rgba(120,90,110,0.08)]
+    dark:border-white/10
+    dark:bg-zinc-900/65
   `,
   mutedLabel:
-    "text-sm text-zinc-400 dark:text-zinc-500",
+    "text-sm font-medium tracking-wide text-zinc-700 dark:text-zinc-300",
   pageTitle:
-    "text-2xl font-semibold tracking-wide text-zinc-800 dark:text-zinc-100",
+    "text-2xl font-semibold tracking-wide text-zinc-900 dark:text-zinc-100",
   bodyText:
-    "text-zinc-700 dark:text-zinc-200",
+    "text-zinc-800 dark:text-zinc-100",
   subtleText:
-    "text-zinc-500 dark:text-zinc-400",
+    "text-zinc-600 dark:text-zinc-400",
   nav: `
     rounded-[30px]
-    border border-white/60
-    bg-white/70
-    backdrop-blur-xl
-    shadow-[0_8px_30px_rgba(0,0,0,0.08)]
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/85
-    dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)]
+    border border-white/75
+    bg-white/60
+    backdrop-blur-2xl
+    shadow-[0_1px_0_rgba(255,255,255,0.95)_inset,0_12px_40px_rgba(120,90,110,0.16),0_4px_14px_rgba(120,90,110,0.08)]
+    ring-1
+    ring-white/40
+    dark:border-white/12
+    dark:bg-zinc-900/65
+    dark:shadow-[0_1px_0_rgba(255,255,255,0.1)_inset,0_14px_40px_rgba(0,0,0,0.5),0_4px_14px_rgba(0,0,0,0.3)]
+    dark:ring-white/10
   `,
   navLink:
-    "text-sm text-zinc-500 dark:text-zinc-400",
+    "text-sm font-medium text-zinc-600 dark:text-zinc-400",
   input: `
     w-full
     rounded-2xl
-    border border-zinc-200
-    bg-white
+    border border-white/80
+    bg-white/50
     text-zinc-800
     outline-none
-    dark:border-zinc-700
-    dark:bg-zinc-900
+    backdrop-blur-md
+    shadow-[0_1px_0_rgba(255,255,255,0.7)_inset]
+    dark:border-white/10
+    dark:bg-zinc-900/55
     dark:text-zinc-100
   `,
   chip: `
     rounded-full
-    bg-white
-    text-zinc-500
-    shadow-[0_2px_10px_rgba(0,0,0,0.05)]
-    dark:bg-zinc-800
+    border border-white/75
+    bg-white/55
+    text-zinc-700
+    backdrop-blur-md
+    shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_2px_10px_rgba(120,90,110,0.08)]
+    dark:border-white/10
+    dark:bg-zinc-800/60
     dark:text-zinc-300
-    dark:shadow-[0_2px_10px_rgba(0,0,0,0.25)]
   `,
   heroCard: `
     relative
     overflow-hidden
     rounded-[34px]
-    border border-white/60
-    bg-white/75
+    border border-white/75
+    bg-white/60
     p-5
     backdrop-blur-2xl
-    shadow-[0_10px_30px_rgba(0,0,0,0.05)]
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/80
-    dark:shadow-[0_10px_30px_rgba(0,0,0,0.28)]
+    shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_12px_40px_rgba(120,90,110,0.12)]
+    dark:border-white/10
+    dark:bg-zinc-900/55
+    dark:shadow-[0_12px_40px_rgba(0,0,0,0.4)]
   `,
   heroCardLg: `
     relative
     overflow-hidden
     rounded-[38px]
-    border border-white/60
-    bg-white/75
+    border border-white/75
+    bg-white/60
     p-6
     backdrop-blur-2xl
-    shadow-[0_10px_40px_rgba(0,0,0,0.06)]
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/80
-    dark:shadow-[0_10px_40px_rgba(0,0,0,0.28)]
+    shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_14px_44px_rgba(120,90,110,0.13)]
+    dark:border-white/10
+    dark:bg-zinc-900/55
+    dark:shadow-[0_14px_44px_rgba(0,0,0,0.42)]
   `,
   heroSheen: `
     pointer-events-none
     absolute
     inset-0
-    bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.9),transparent_35%)]
-    opacity-80
-    dark:opacity-0
+    bg-[linear-gradient(135deg,rgba(255,255,255,0.55)_0%,rgba(255,255,255,0.08)_42%,transparent_70%)]
+    opacity-90
+    dark:opacity-20
   `,
   glassBadge: `
     rounded-full
-    border border-white/60
-    bg-white/70
+    border border-white/75
+    bg-white/55
     px-4
     py-2
     text-sm
-    text-zinc-500
+    text-zinc-700
     backdrop-blur-xl
-    shadow-[0_2px_10px_rgba(0,0,0,0.04)]
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/70
-    dark:text-zinc-400
-    dark:shadow-[0_2px_10px_rgba(0,0,0,0.25)]
+    shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_2px_12px_rgba(120,90,110,0.08)]
+    dark:border-white/10
+    dark:bg-zinc-900/55
+    dark:text-zinc-300
   `,
   roundButton: `
     rounded-full
-    bg-white/70
+    border border-white/75
+    bg-white/55
     px-3
     py-2
     text-sm
-    text-zinc-500
-    shadow-[0_2px_10px_rgba(0,0,0,0.03)]
-    dark:bg-zinc-800/80
-    dark:text-zinc-400
-    dark:shadow-[0_2px_10px_rgba(0,0,0,0.25)]
+    text-zinc-700
+    backdrop-blur-xl
+    shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_2px_10px_rgba(120,90,110,0.08)]
+    dark:border-white/10
+    dark:bg-zinc-800/55
+    dark:text-zinc-300
   `,
   roundButtonMd: `
     rounded-full
-    bg-white
+    border border-white/75
+    bg-white/60
     px-4
     py-2
     text-sm
-    text-zinc-500
-    shadow-[0_2px_10px_rgba(0,0,0,0.05)]
-    dark:bg-zinc-800/80
-    dark:text-zinc-400
-    dark:shadow-[0_2px_10px_rgba(0,0,0,0.25)]
+    text-zinc-700
+    backdrop-blur-xl
+    shadow-[0_1px_0_rgba(255,255,255,0.85)_inset,0_2px_12px_rgba(120,90,110,0.09)]
+    dark:border-white/10
+    dark:bg-zinc-800/55
+    dark:text-zinc-300
   `,
   countChip: `
     rounded-full
-    bg-zinc-100
+    border border-white/60
+    bg-white/55
     px-3
     py-1
     text-xs
-    text-zinc-500
-    dark:bg-zinc-800
-    dark:text-zinc-400
+    font-medium
+    text-zinc-700
+    backdrop-blur-md
+    dark:border-white/10
+    dark:bg-zinc-800/55
+    dark:text-zinc-300
   `,
   emptyPanel: `
     rounded-2xl
-    border border-dashed border-zinc-200
-    bg-white/70
+    border border-dashed border-white/80
+    bg-white/45
     px-4
     py-5
     text-center
     text-sm
-    text-zinc-400
-    dark:border-zinc-700
-    dark:bg-zinc-900/60
-    dark:text-zinc-500
+    text-zinc-600
+    backdrop-blur-md
+    dark:border-white/15
+    dark:bg-zinc-900/40
+    dark:text-zinc-400
   `,
   taskButton: `
     w-full
     rounded-2xl
-    border border-white/60
-    bg-white/70
+    border border-white/70
+    bg-white/50
     px-4
     py-4
     text-left
     backdrop-blur-xl
+    shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_4px_16px_rgba(120,90,110,0.07)]
     transition-all
     duration-300
-    dark:border-zinc-700/50
-    dark:bg-zinc-900/70
+    dark:border-white/10
+    dark:bg-zinc-900/50
+    dark:shadow-none
   `,
   dayCellIdle: `
-    border-zinc-200
-    bg-white/90
-    shadow-[0_2px_10px_rgba(0,0,0,0.03)]
-    dark:border-zinc-700
-    dark:bg-zinc-900/85
-    dark:shadow-[0_2px_10px_rgba(0,0,0,0.22)]
+    border-white/70
+    bg-white/55
+    backdrop-blur-md
+    shadow-[0_1px_0_rgba(255,255,255,0.75)_inset,0_2px_10px_rgba(120,90,110,0.07)]
+    dark:border-white/10
+    dark:bg-zinc-900/55
   `,
   dayCellToday: `
-    bg-white
-    dark:bg-zinc-900/90
+    bg-white/70
+    backdrop-blur-md
+    dark:bg-zinc-900/70
   `,
   weekDaySelected: `
     border-[var(--theme-accent)]
-    bg-[color-mix(in_srgb,var(--theme-accent)_14%,transparent)]
-    shadow-[0_4px_16px_color-mix(in_srgb,var(--theme-accent-shadow)_45%,transparent)]
-    dark:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]
+    bg-[color-mix(in_srgb,var(--theme-accent)_18%,white)]
+    shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_4px_16px_color-mix(in_srgb,var(--theme-accent-shadow)_40%,transparent)]
+    backdrop-blur-md
+    dark:bg-[color-mix(in_srgb,var(--theme-accent)_16%,transparent)]
   `,
   monthDayShiftWork: `
     border-[var(--theme-accent-border)]
-    bg-[color-mix(in_srgb,var(--theme-accent)_14%,transparent)]
+    bg-[color-mix(in_srgb,var(--theme-accent)_18%,white)]
   `,
   monthDayShiftSchedule: `
-    border-violet-300/70
-    bg-[color-mix(in_srgb,#8b5cf6_14%,transparent)]
+    border-violet-200/80
+    bg-[color-mix(in_srgb,#c4b5fd_22%,white)]
     dark:border-violet-800/55
   `,
   monthDayToday: `
     ring-2
-    ring-[color-mix(in_srgb,var(--theme-accent-border)_50%,transparent)]
+    ring-[color-mix(in_srgb,var(--theme-accent-border)_55%,white)]
   `,
   monthDayIdle: `
-    border-zinc-200
-    bg-white
-    dark:border-zinc-700
-    dark:bg-zinc-900/85
+    border-white/70
+    bg-white/55
+    backdrop-blur-md
+    dark:border-white/10
+    dark:bg-zinc-900/55
   `,
   panelIdle: `
-    border-zinc-200
-    bg-white
-    dark:border-zinc-700
-    dark:bg-zinc-900/85
+    border-white/70
+    bg-white/55
+    backdrop-blur-md
+    dark:border-white/10
+    dark:bg-zinc-900/55
   `,
   editToggleIdle: `
-    bg-white/90
+    bg-white/55
     text-zinc-700
-    border border-white/60
-    dark:bg-zinc-900/85
+    border border-white/75
+    backdrop-blur-md
+    dark:bg-zinc-900/55
     dark:text-zinc-200
-    dark:border-zinc-700/50
+    dark:border-white/10
   `,
 } as const;
