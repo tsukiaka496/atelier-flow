@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 import type { Project } from "@/lib/storage";
+import { isHobbyProject } from "@/lib/storage";
 import { useProjectsRepo } from "@/lib/useProjectsRepo";
 import { appSurfaces } from "@/lib/appSurfaces";
 import {
@@ -14,8 +15,10 @@ import {
 import PageShell from "@/components/PageShell";
 
 type SortType = "deadline" | "progress";
+type SortDir = "asc" | "desc";
 
 const SORT_KEY = "atelier-sort";
+const SORT_DIR_KEY = "atelier-sort-dir";
 const SHOW_COMPLETED_KEY = "atelier-show-completed";
 const PREFS_CHANGED_EVENT = "atelier-flow:projects-list-prefs";
 
@@ -39,6 +42,16 @@ function getSortTypeSnapshot(): SortType {
   }
 
   return "deadline";
+}
+
+function getSortDirSnapshot(): SortDir {
+  const savedDir = localStorage.getItem(SORT_DIR_KEY);
+
+  if (savedDir === "asc" || savedDir === "desc") {
+    return savedDir;
+  }
+
+  return getSortTypeSnapshot() === "progress" ? "desc" : "asc";
 }
 
 function getShowCompletedSnapshot(): boolean {
@@ -72,8 +85,19 @@ export default function ProjectsPage() {
     () => false
   );
 
+  const sortDir = useSyncExternalStore(
+    subscribeListPrefs,
+    getSortDirSnapshot,
+    () => "asc" as SortDir
+  );
+
   function changeSort(type: SortType) {
     localStorage.setItem(SORT_KEY, type);
+    notifyListPrefsChanged();
+  }
+
+  function changeSortDir(dir: SortDir) {
+    localStorage.setItem(SORT_DIR_KEY, dir);
     notifyListPrefsChanged();
   }
 
@@ -94,12 +118,35 @@ export default function ProjectsPage() {
   });
 
   const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const direction = sortDir === "desc" ? -1 : 1;
+
     if (sortType === "deadline") {
-      return getDaysLeft(a.deadline) - getDaysLeft(b.deadline);
+      const aHasDeadline = Boolean(a.deadline);
+      const bHasDeadline = Boolean(b.deadline);
+
+      if (aHasDeadline && !bHasDeadline) {
+        return -1;
+      }
+
+      if (!aHasDeadline && bHasDeadline) {
+        return 1;
+      }
+
+      if (!aHasDeadline && !bHasDeadline) {
+        return 0;
+      }
+
+      return (
+        (getDaysLeft(a.deadline) - getDaysLeft(b.deadline)) *
+        direction
+      );
     }
 
     if (sortType === "progress") {
-      return getProjectProgress(b) - getProjectProgress(a);
+      return (
+        (getProjectProgress(a) - getProjectProgress(b)) *
+        direction
+      );
     }
 
     return 0;
@@ -122,7 +169,7 @@ export default function ProjectsPage() {
                 sortType === "deadline" ? "white" : "#52525b",
             }}
           >
-            納期順
+            納期順 {sortType === "deadline" ? (sortDir === "asc" ? "↑" : "↓") : ""}
           </button>
 
           <button
@@ -138,7 +185,37 @@ export default function ProjectsPage() {
                 sortType === "progress" ? "white" : "#52525b",
             }}
           >
-            進捗順
+            進捗順 {sortType === "progress" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeSortDir("asc")}
+            className="rounded-full px-4 py-2 text-sm transition-all"
+            style={{
+              background:
+                sortDir === "asc"
+                  ? "var(--theme-accent)"
+                  : "rgba(255,255,255,0.7)",
+              color: sortDir === "asc" ? "white" : "#52525b",
+            }}
+          >
+            昇順
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeSortDir("desc")}
+            className="rounded-full px-4 py-2 text-sm transition-all"
+            style={{
+              background:
+                sortDir === "desc"
+                  ? "var(--theme-accent)"
+                  : "rgba(255,255,255,0.7)",
+              color: sortDir === "desc" ? "white" : "#52525b",
+            }}
+          >
+            降順
           </button>
 
           <button
@@ -178,6 +255,7 @@ export default function ProjectsPage() {
             const daysLeft = getDaysLeft(project.deadline);
             const progress = getProjectProgress(project);
             const projectDone = isProjectFullyCompleted(project);
+            const hobby = isHobbyProject(project);
 
             return (
               <Link
@@ -218,8 +296,30 @@ export default function ProjectsPage() {
                               : ""
                           }`}
                         >
-                          {project.client || "依頼主なし"}
+                          {hobby
+                            ? project.title || "描きたいものなし"
+                            : project.client || "依頼主なし"}
                         </h2>
+
+                        <span
+                          className="
+                            rounded-full
+                            px-2
+                            py-0.5
+                            text-[10px]
+                            font-medium
+                          "
+                          style={{
+                            background: hobby
+                              ? "rgba(167,139,250,0.18)"
+                              : "color-mix(in srgb, var(--theme-accent) 16%, transparent)",
+                            color: hobby
+                              ? "#7c3aed"
+                              : "var(--theme-accent)",
+                          }}
+                        >
+                          {hobby ? "趣味" : "案件"}
+                        </span>
 
                         {projectDone && (
                           <span
@@ -241,11 +341,21 @@ export default function ProjectsPage() {
                         )}
                       </div>
 
-                      <p
-                        className={`mt-1 text-sm ${appSurfaces.subtleText}`}
-                      >
-                        {project.title || "依頼内容なし"}
-                      </p>
+                      {!hobby && (
+                        <p
+                          className={`mt-1 text-sm ${appSurfaces.subtleText}`}
+                        >
+                          {project.title || "依頼内容なし"}
+                        </p>
+                      )}
+
+                      {hobby && (
+                        <p
+                          className={`mt-1 text-sm ${appSurfaces.subtleText}`}
+                        >
+                          描きたいもの
+                        </p>
+                      )}
 
                       <div className="mt-3 flex flex-wrap gap-2">
                         {project.tasks.map((task) => (

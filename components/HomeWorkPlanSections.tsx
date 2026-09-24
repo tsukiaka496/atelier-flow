@@ -22,8 +22,9 @@ function TaskRow({
   item: HomeEnrichedTask;
   onToggleTask: HomeWorkPlanSectionsProps["onToggleTask"];
 }) {
-  const { task, projectId, projectColor, projectTitle, client } =
+  const { task, projectId, projectColor, projectTitle, client, kind } =
     item;
+  const hobby = kind === "hobby";
 
   return (
     <div
@@ -79,11 +80,17 @@ function TaskRow({
             </div>
 
             <div className="mt-2 pl-5">
-              <p className="truncate text-xs text-zinc-500">
-                {client}
-              </p>
+              {!hobby && (
+                <p className="truncate text-xs text-zinc-500">
+                  {client}
+                </p>
+              )}
 
-              <p className="mt-1 truncate text-xs text-zinc-400">
+              <p
+                className={`truncate text-xs text-zinc-400 ${
+                  hobby ? "" : "mt-1"
+                }`}
+              >
                 {projectTitle}
               </p>
             </div>
@@ -149,7 +156,9 @@ export default function HomeWorkPlanSections({
 
       links.set(
         item.projectId,
-        item.client || item.projectTitle || "案件"
+        item.kind === "hobby"
+          ? item.projectTitle || "趣味"
+          : item.client || item.projectTitle || "案件"
       );
     }
 

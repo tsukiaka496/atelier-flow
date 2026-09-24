@@ -11,18 +11,22 @@ import {
   MEMO_IMPORTANCE_HIGH,
   MEMO_IMPORTANCE_NORMAL,
 } from "@/lib/memoImportance";
+import type { MemoGroup } from "@/lib/storage";
 import { formatLocalDate } from "@/lib/taskPlan";
 import { theme } from "@/lib/themeClasses";
 
 type QuickMemoComposerProps = {
+  groups: MemoGroup[];
   onAdd: (draft: {
     content: string;
     date: string;
     importance: number;
+    groupId?: string;
   }) => void;
 };
 
 export default function QuickMemoComposer({
+  groups = [],
   onAdd,
 }: QuickMemoComposerProps) {
   const inputRef =
@@ -34,6 +38,7 @@ export default function QuickMemoComposer({
   const [importance, setImportance] = useState(
     MEMO_IMPORTANCE_NORMAL
   );
+  const [groupId, setGroupId] = useState("");
 
   useEffect(() => {
     inputRef.current?.focus({
@@ -53,12 +58,14 @@ export default function QuickMemoComposer({
       content: text,
       date: noDate ? "" : date,
       importance,
+      groupId: groupId || undefined,
     });
 
     setContent("");
     setNoDate(true);
     setDate("");
     setImportance(MEMO_IMPORTANCE_NORMAL);
+    setGroupId("");
     inputRef.current?.focus({
       preventScroll: true,
     });
@@ -254,6 +261,45 @@ export default function QuickMemoComposer({
           >
             重要
           </button>
+        </div>
+      </div>
+
+      <div className="mt-2">
+        <p className={`mb-1.5 text-[11px] ${appSurfaces.mutedLabel}`}>
+          グループ
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setGroupId("")}
+            className="rounded-full px-3 py-1 text-[11px] transition-all"
+            style={{
+              background: !groupId
+                ? "var(--theme-accent)"
+                : "rgba(255,255,255,0.7)",
+              color: !groupId ? "white" : "#52525b",
+            }}
+          >
+            未分類
+          </button>
+          {groups.map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => setGroupId(group.id)}
+              className="rounded-full px-3 py-1 text-[11px] transition-all"
+              style={{
+                background:
+                  groupId === group.id
+                    ? "var(--theme-accent)"
+                    : "rgba(255,255,255,0.7)",
+                color:
+                  groupId === group.id ? "white" : "#52525b",
+              }}
+            >
+              {group.name || "無題"}
+            </button>
+          ))}
         </div>
       </div>
     </div>

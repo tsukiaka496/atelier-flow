@@ -6,6 +6,7 @@ import Link from "next/link";
 import { saveProjectsRepo } from "@/lib/projectsRepo";
 import { saveMemosRepo } from "@/lib/memosRepo";
 import { getMemoText } from "@/lib/memoDisplay";
+import { isHobbyProject } from "@/lib/storage";
 import { useProjectsRepo } from "@/lib/useProjectsRepo";
 import { useMemos } from "@/lib/useMemos";
 import {
@@ -412,7 +413,9 @@ export default function Home() {
               </p>
             </div>
             <p className="mt-2 pl-5 truncate text-xs text-zinc-500">
-              {item.client || item.projectTitle}
+              {item.kind === "hobby"
+                ? item.projectTitle
+                : item.client || item.projectTitle}
             </p>
           </div>
 
@@ -609,18 +612,36 @@ export default function Home() {
                     <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                       締切
                     </p>
-                    <p
-                      className={`mt-1 text-sm font-medium ${appSurfaces.bodyText}`}
-                    >
-                      {project.client ||
-                        "依頼主なし"}
-                    </p>
-                    <p
-                      className={`mt-0.5 text-xs ${appSurfaces.subtleText}`}
-                    >
-                      {project.title ||
-                        "依頼内容なし"}
-                    </p>
+                    {isHobbyProject(project) ? (
+                      <>
+                        <p
+                          className={`mt-1 text-sm font-medium ${appSurfaces.bodyText}`}
+                        >
+                          {project.title ||
+                            "描きたいものなし"}
+                        </p>
+                        <p
+                          className={`mt-0.5 text-xs ${appSurfaces.subtleText}`}
+                        >
+                          趣味
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p
+                          className={`mt-1 text-sm font-medium ${appSurfaces.bodyText}`}
+                        >
+                          {project.client ||
+                            "依頼主なし"}
+                        </p>
+                        <p
+                          className={`mt-0.5 text-xs ${appSurfaces.subtleText}`}
+                        >
+                          {project.title ||
+                            "依頼内容なし"}
+                        </p>
+                      </>
+                    )}
                   </Link>
                 ))}
               </div>

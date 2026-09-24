@@ -7,7 +7,7 @@ import {
 } from "next/navigation";
 import { useState } from "react";
 
-import type { Project } from "@/lib/storage";
+import { isHobbyProject, type Project } from "@/lib/storage";
 import {
   getProjectsRepo,
   saveProjectsRepo,
@@ -363,7 +363,13 @@ export default function ProjectDetailPage() {
   const todayString = formatLocalDate(new Date());
 
   return (
-    <PageShell title={currentProject.title || "案件"}>
+    <PageShell
+      title={
+        isHobbyProject(currentProject)
+          ? currentProject.title || "趣味"
+          : currentProject.title || "案件"
+      }
+    >
       <div className="mx-auto max-w-xl">
         <div className="mb-6 flex items-center justify-between">
           <Link
@@ -403,12 +409,25 @@ export default function ProjectDetailPage() {
                 />
 
                 <div>
-                  <h1 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100">
-                    {currentProject.client || "依頼主なし"}
-                  </h1>
-                  <p className={`mt-2 text-sm ${appSurfaces.subtleText}`}>
-                    {currentProject.title || "依頼内容なし"}
-                  </p>
+                  {isHobbyProject(currentProject) ? (
+                    <>
+                      <p className={`text-xs ${appSurfaces.subtleText}`}>
+                        描きたいもの
+                      </p>
+                      <h1 className="mt-1 text-xl font-semibold text-zinc-800 dark:text-zinc-100">
+                        {currentProject.title || "描きたいものなし"}
+                      </h1>
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100">
+                        {currentProject.client || "依頼主なし"}
+                      </h1>
+                      <p className={`mt-2 text-sm ${appSurfaces.subtleText}`}>
+                        {currentProject.title || "依頼内容なし"}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 

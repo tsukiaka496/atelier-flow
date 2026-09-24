@@ -7,11 +7,11 @@ import { useState } from "react";
 import {
   DEFAULT_PROJECT_COLOR,
   normalizeProjectColor,
+  type ProjectKind,
   type ScheduleSlot,
   type Task,
 } from "@/lib/storage";
 import { addProjectRepo } from "@/lib/projectsRepo";
-import { createProjectTemplateDraft } from "@/lib/projectTemplate";
 import {
   createScheduleSlot,
   ensureTaskScheduleSlots,
@@ -42,12 +42,14 @@ function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
 export default function NewProjectPage() {
   const router = useRouter();
 
+  const [kind, setKind] = useState<ProjectKind>("commission");
   const [client, setClient] = useState("");
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>([]);
+  const isHobby = kind === "hobby";
 
   const [taskTitle, setTaskTitle] = useState("");
 
@@ -55,16 +57,6 @@ export default function NewProjectPage() {
     null
   );
   const [editTitle, setEditTitle] = useState("");
-
-  function applyTemplate() {
-    const draft = createProjectTemplateDraft();
-    setClient(draft.client);
-    setTitle(draft.title);
-    setDeadline(draft.deadline);
-    setColor(draft.color);
-    setTasks(draft.tasks);
-    setSchedule(draft.schedule);
-  }
 
   function addTask() {
     if (!taskTitle.trim()) return;
@@ -181,19 +173,20 @@ export default function NewProjectPage() {
   function handleCreate() {
     addProjectRepo({
       id: crypto.randomUUID(),
-      client: client.trim(),
+      client: isHobby ? "" : client.trim(),
       title: title.trim(),
       color: normalizeProjectColor(color),
       deadline,
       tasks,
       schedule: ensureTaskScheduleSlots(tasks, schedule),
+      kind,
     });
 
     router.push("/projects");
   }
 
   return (
-    <PageShell title="案件を作成" showNav={false}>
+    <PageShell title={isHobby ? "趣味を作成" : "案件を作成"} showNav={false}>
       <div className="mx-auto min-w-0 max-w-xl">
         <Link
           href="/projects"
@@ -206,48 +199,62 @@ export default function NewProjectPage() {
           <div className={appSurfaces.heroSheen} />
 
           <div className="relative z-10">
-            <button
-              type="button"
-              onClick={applyTemplate}
-              className={`
-                mb-6
-                w-full
-                rounded-[24px]
-                border border-zinc-200
-                bg-white/80
-                px-4
-                py-4
-                text-sm
-                text-zinc-700
-                shadow-[0_8px_28px_rgba(0,0,0,0.06)]
-                dark:border-zinc-700
-                dark:bg-zinc-900/85
-                dark:text-zinc-200
-              `}
-            >
-              テンプレート作成
-            </button>
-
-            <div className="mb-6">
-              <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
-                依頼主
-              </p>
-              <input
-                value={client}
-                onChange={(event) => setClient(event.target.value)}
-                placeholder="例: 依頼主の名前"
-                className={`px-4 py-4 ${appSurfaces.input}`}
-              />
+            <div className="mb-6 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setKind("commission")}
+                className="rounded-[24px] px-4 py-4 text-sm transition-all"
+                style={{
+                  background:
+                    kind === "commission"
+                      ? "var(--theme-accent)"
+                      : "rgba(255,255,255,0.8)",
+                  color:
+                    kind === "commission" ? "white" : "#3f3f46",
+                }}
+              >
+                案件
+              </button>
+              <button
+                type="button"
+                onClick={() => setKind("hobby")}
+                className="rounded-[24px] px-4 py-4 text-sm transition-all"
+                style={{
+                  background:
+                    kind === "hobby"
+                      ? "var(--theme-accent)"
+                      : "rgba(255,255,255,0.8)",
+                  color: kind === "hobby" ? "white" : "#3f3f46",
+                }}
+              >
+                趣味
+              </button>
             </div>
 
+            {!isHobby && (
+              <div className="mb-6">
+                <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
+                  依頼主
+                </p>
+                <input
+                  value={client}
+                  onChange={(event) => setClient(event.target.value)}
+                  placeholder="例: 依頼主の名前"
+                  className={`px-4 py-4 ${appSurfaces.input}`}
+                />
+              </div>
+            )}
+
             <div className="mb-6">
               <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
-                依頼内容
+                {isHobby ? "描きたいもの" : "依頼内容"}
               </p>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="例: MVイラスト"
+                placeholder={
+                  isHobby ? "例: 星空のイラスト" : "例: MVイラスト"
+                }
                 className={`px-4 py-4 ${appSurfaces.input}`}
               />
             </div>
@@ -349,7 +356,7 @@ export default function NewProjectPage() {
             ${theme.btnSolid}
           `}
         >
-          案件作成
+          {isHobby ? "趣味を作成" : "案件作成"}
         </button>
 
         <TaskEditorSheet

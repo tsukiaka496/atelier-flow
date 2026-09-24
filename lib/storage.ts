@@ -21,6 +21,8 @@ export type ScheduleSlot = {
   taskId?: string;
 };
 
+export type ProjectKind = "commission" | "hobby";
+
 export type Project = {
   id: string;
   title: string;
@@ -31,6 +33,8 @@ export type Project = {
   schedule: ScheduleSlot[];
   /** 作業がない案件の手動完了（100% / 0%） */
   manualCompleted?: boolean;
+  /** 欠落・不正値は commission（既存データはすべて案件） */
+  kind?: ProjectKind;
 };
 
 export type ShiftTemplateKind =
@@ -61,6 +65,14 @@ export type Memo = {
   isCompleted: boolean;
   createdAt: string;
   updatedAt: string;
+  /** 欠落・空・不明な ID は未分類として扱う */
+  groupId?: string;
+};
+
+export type MemoGroup = {
+  id: string;
+  name: string;
+  sortOrder: number;
 };
 
 export type TimelineSlot = {
@@ -102,6 +114,8 @@ export type BackupData = {
   theme?: ThemeSettings;
   /** v3 以降。旧バックアップとの互換のため省略可 */
   timeline?: TimelinePlan;
+  /** v4 以降。旧バックアップとの互換のため省略可 */
+  memoGroups?: MemoGroup[];
 };
 
 const STORAGE_KEY =
@@ -119,6 +133,9 @@ const THEME_KEY =
 const MEMOS_KEY =
   "atelier-flow-memos";
 
+const MEMO_GROUPS_KEY =
+  "atelier-flow-memo-groups";
+
 const TIMELINE_KEY =
   "atelier-flow-timeline";
 
@@ -128,12 +145,14 @@ const ONBOARDING_KEY =
 
 const PREF_KEYS = [
   "atelier-sort",
+  "atelier-sort-dir",
   "atelier-show-completed",
   "atelier-memos-sort",
+  "atelier-memos-sort-dir",
   "atelier-show-completed-memos",
 ] as const;
 
-const BACKUP_VERSION = 3;
+const BACKUP_VERSION = 4;
 
 const SHIFTS_CHANGED_EVENT =
   "atelier-flow:shifts-changed";
@@ -232,6 +251,7 @@ export const EMPTY_PROJECTS: Project[] = [];
 export const EMPTY_SHIFTS: Shift[] = [];
 export const EMPTY_SHIFT_TEMPLATES: ShiftTemplate[] = [];
 export const EMPTY_MEMOS: Memo[] = [];
+export const EMPTY_MEMO_GROUPS: MemoGroup[] = [];
 export const EMPTY_TIMELINE: TimelinePlan = {
   weekday: [],
   holiday: [],
@@ -253,6 +273,9 @@ let themeSnapshot: ThemeSettings = DEFAULT_THEME;
 let memosSnapshotKey: string | null | undefined;
 let memosSnapshot: Memo[] = EMPTY_MEMOS;
 
+let memoGroupsSnapshotKey: string | null | undefined;
+let memoGroupsSnapshot: MemoGroup[] = EMPTY_MEMO_GROUPS;
+
 let timelineSnapshotKey: string | null | undefined;
 let timelineSnapshot: TimelinePlan = EMPTY_TIMELINE;
 
@@ -267,8 +290,22 @@ function invalidateStorageSnapshots() {
   themeSnapshot = DEFAULT_THEME;
   memosSnapshotKey = undefined;
   memosSnapshot = EMPTY_MEMOS;
+  memoGroupsSnapshotKey = undefined;
+  memoGroupsSnapshot = EMPTY_MEMO_GROUPS;
   timelineSnapshotKey = undefined;
   timelineSnapshot = EMPTY_TIMELINE;
+}
+
+export function normalizeProjectKind(
+  value: unknown
+): ProjectKind {
+  return value === "hobby" ? "hobby" : "commission";
+}
+
+export function isHobbyProject(
+  project: Pick<Project, "kind">
+): boolean {
+  return normalizeProjectKind(project.kind) === "hobby";
 }
 
 /** 案件イメージカラーの初期値（UIアクセントとは別） */
@@ -413,6 +450,8 @@ export function normalizeProject(
       typeof project?.manualCompleted === "boolean"
         ? project.manualCompleted
         : undefined,
+
+    kind: normalizeProjectKind(project?.kind),
   };
 }
 
@@ -920,6 +959,38 @@ export function normalizeMemo(
       typeof memo?.updatedAt === "string"
         ? memo.updatedAt
         : now,
+
+    groupId:
+      typeof memo?.groupId === "string" &&
+      memo.groupId.trim() !== ""
+        ? memo.groupId
+        : undefined,
+  };
+}
+
+export function normalizeMemoGroup(
+  raw: unknown
+): MemoGroup {
+  const group = raw as Record<string, unknown>;
+  const sortOrderRaw = group?.sortOrder;
+  const sortOrder =
+    typeof sortOrderRaw === "number" &&
+    Number.isFinite(sortOrderRaw)
+      ? Math.floor(sortOrderRaw)
+      : typeof sortOrderRaw === "string" &&
+          Number.isFinite(Number(sortOrderRaw))
+        ? Math.floor(Number(sortOrderRaw))
+        : 0;
+
+  return {
+    id: String(
+      group?.id ?? crypto.randomUUID()
+    ),
+    name:
+      typeof group?.name === "string"
+        ? group.name
+        : "",
+    sortOrder,
   };
 }
 
@@ -966,6 +1037,61 @@ export function saveMemos(memos: Memo[]) {
 
   memosSnapshotKey = json;
   memosSnapshot = normalized;
+}
+
+/* =========================
+   Memo Groups
+========================= */
+
+export function getMemoGroups(): MemoGroup[] {
+  if (typeof window === "undefined") {
+    return EMPTY_MEMO_GROUPS;
+  }
+
+  const data =
+    localStorage.getItem(MEMO_GROUPS_KEY);
+
+  if (data === memoGroupsSnapshotKey) {
+    return memoGroupsSnapshot;
+  }
+
+  memoGroupsSnapshotKey = data;
+
+  if (!data) {
+    memoGroupsSnapshot = EMPTY_MEMO_GROUPS;
+    return memoGroupsSnapshot;
+  }
+
+  try {
+    const parsed = JSON.parse(data);
+
+    if (!Array.isArray(parsed)) {
+      memoGroupsSnapshot = EMPTY_MEMO_GROUPS;
+      return memoGroupsSnapshot;
+    }
+
+    memoGroupsSnapshot = parsed
+      .map(normalizeMemoGroup)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    return memoGroupsSnapshot;
+  } catch {
+    memoGroupsSnapshot = EMPTY_MEMO_GROUPS;
+    return memoGroupsSnapshot;
+  }
+}
+
+export function saveMemoGroups(
+  groups: MemoGroup[]
+) {
+  const normalized = groups
+    .map(normalizeMemoGroup)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const json = JSON.stringify(normalized);
+
+  localStorage.setItem(MEMO_GROUPS_KEY, json);
+
+  memoGroupsSnapshotKey = json;
+  memoGroupsSnapshot = normalized;
 }
 
 /* =========================
@@ -1042,6 +1168,8 @@ export function createBackupData(): BackupData {
     theme: getTheme(),
 
     timeline: getTimeline(),
+
+    memoGroups: getMemoGroups(),
   };
 }
 
@@ -1191,6 +1319,12 @@ export async function importBackupFile(
       normalizeBackupMemos(parsed)
     );
 
+    saveMemoGroups(
+      Array.isArray(parsed.memoGroups)
+        ? parsed.memoGroups.map(normalizeMemoGroup)
+        : []
+    );
+
     if (parsed.theme) {
       saveTheme({
         ...defaultTheme,
@@ -1242,6 +1376,10 @@ export function invalidateStorageCacheFromEvent(
     memosSnapshotKey = null;
   }
 
+  if (key === MEMO_GROUPS_KEY || key === null) {
+    memoGroupsSnapshotKey = null;
+  }
+
   if (key === TIMELINE_KEY || key === null) {
     timelineSnapshotKey = null;
   }
@@ -1275,6 +1413,10 @@ export function clearAllData() {
 
   localStorage.removeItem(
     MEMOS_KEY
+  );
+
+  localStorage.removeItem(
+    MEMO_GROUPS_KEY
   );
 
   localStorage.removeItem(

@@ -8,10 +8,10 @@ import {
 import { useState } from "react";
 
 import {
+  isHobbyProject,
   normalizeProject,
   normalizeProjectColor,
   type Project,
-  type ScheduleSlot,
   type Task,
 } from "@/lib/storage";
 import {
@@ -279,6 +279,9 @@ export default function EditProjectPage() {
   function saveProject() {
     const normalized = normalizeProject({
       ...project!,
+      client: isHobbyProject(project!)
+        ? ""
+        : project!.client,
       schedule: ensureTaskScheduleSlots(
         project!.tasks,
         project!.schedule
@@ -296,7 +299,10 @@ export default function EditProjectPage() {
   }
 
   return (
-    <PageShell title="案件編集" showNav={false}>
+    <PageShell
+      title={isHobbyProject(project) ? "趣味を編集" : "案件編集"}
+      showNav={false}
+    >
       <div className="mx-auto max-w-xl">
         <Link
           href={`/projects/${project.id}`}
@@ -309,22 +315,24 @@ export default function EditProjectPage() {
           <div className={appSurfaces.heroSheen} />
 
           <div className="relative z-10">
-            <div className="mb-6">
-              <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
-                依頼主
-              </p>
-              <input
-                value={project.client}
-                onChange={(event) =>
-                  updateField("client", event.target.value)
-                }
-                className={`px-4 py-4 ${appSurfaces.input}`}
-              />
-            </div>
+            {!isHobbyProject(project) && (
+              <div className="mb-6">
+                <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
+                  依頼主
+                </p>
+                <input
+                  value={project.client}
+                  onChange={(event) =>
+                    updateField("client", event.target.value)
+                  }
+                  className={`px-4 py-4 ${appSurfaces.input}`}
+                />
+              </div>
+            )}
 
             <div className="mb-6">
               <p className={`mb-2 ${appSurfaces.mutedLabel}`}>
-                依頼内容
+                {isHobbyProject(project) ? "描きたいもの" : "依頼内容"}
               </p>
               <input
                 value={project.title}

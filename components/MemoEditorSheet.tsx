@@ -2,6 +2,8 @@
 
 import ImportanceSelect from "@/components/ImportanceSelect";
 import MemoDateField from "@/components/MemoDateField";
+import { appSurfaces } from "@/lib/appSurfaces";
+import type { MemoGroup } from "@/lib/storage";
 import { theme } from "@/lib/themeClasses";
 
 type MemoEditorSheetProps = {
@@ -9,9 +11,12 @@ type MemoEditorSheetProps = {
   content: string;
   date: string;
   importance: number;
+  groupId: string;
+  groups: MemoGroup[];
   onContentChange: (value: string) => void;
   onDateChange: (value: string) => void;
   onImportanceChange: (value: number) => void;
+  onGroupChange: (value: string) => void;
   onSave: () => void;
   onClose: () => void;
   onDelete?: () => void;
@@ -22,9 +27,12 @@ export default function MemoEditorSheet({
   content,
   date,
   importance,
+  groupId,
+  groups = [],
   onContentChange,
   onDateChange,
   onImportanceChange,
+  onGroupChange,
   onSave,
   onClose,
   onDelete,
@@ -90,6 +98,45 @@ export default function MemoEditorSheet({
               value={importance}
               onChange={onImportanceChange}
             />
+
+            <div className="mb-6">
+              <p className={`mb-2 text-sm ${appSurfaces.mutedLabel}`}>
+                グループ
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onGroupChange("")}
+                  className="rounded-full px-3 py-2 text-xs transition-all"
+                  style={{
+                    background: !groupId
+                      ? "var(--theme-accent)"
+                      : "rgba(255,255,255,0.7)",
+                    color: !groupId ? "white" : "#52525b",
+                  }}
+                >
+                  未分類
+                </button>
+                {groups.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => onGroupChange(group.id)}
+                    className="rounded-full px-3 py-2 text-xs transition-all"
+                    style={{
+                      background:
+                        groupId === group.id
+                          ? "var(--theme-accent)"
+                          : "rgba(255,255,255,0.7)",
+                      color:
+                        groupId === group.id ? "white" : "#52525b",
+                    }}
+                  >
+                    {group.name || "無題"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-2">

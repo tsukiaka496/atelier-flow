@@ -1,4 +1,10 @@
-import type { Project, ScheduleSlot, Task } from "@/lib/storage";
+import type {
+  Project,
+  ProjectKind,
+  ScheduleSlot,
+  Task,
+} from "@/lib/storage";
+import { normalizeProjectKind } from "@/lib/storage";
 import {
   getSlotsForDate,
   getTasksForDate,
@@ -28,6 +34,7 @@ export type HomeEnrichedTask = {
   projectTitle: string;
   projectColor: string;
   client: string;
+  kind: ProjectKind;
 };
 
 /** 複数案件から指定日の作業を enrich して返す */
@@ -51,6 +58,7 @@ export function getEnrichedTasksForDate(
         projectTitle: project.title,
         projectColor: project.color,
         client: project.client,
+        kind: normalizeProjectKind(project.kind),
       });
     }
   }
@@ -73,6 +81,7 @@ export function getEnrichedUnscheduledTasks(
         projectTitle: project.title,
         projectColor: project.color,
         client: project.client,
+        kind: normalizeProjectKind(project.kind),
       });
     }
   }
@@ -128,6 +137,7 @@ export function getOverdueEnrichedTasks(
         projectTitle: project.title,
         projectColor: project.color,
         client: project.client,
+        kind: normalizeProjectKind(project.kind),
       });
     }
   }
